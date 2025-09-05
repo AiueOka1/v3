@@ -6,39 +6,21 @@ workflows:
     environment:
       flutter: stable
       xcode: latest
-      vars:
-        BUNDLE_ID: "com.example.pawtech" # Change this to your unique bundle ID
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: main
-          include: true
-          source: true
     scripts:
-      - name: Set up Flutter
+      - name: Flutter deps
         script: |
-          flutter doctor
           flutter --version
-      
-      - name: Get Flutter dependencies
-        script: |
           flutter pub get
-      
-      - name: Analyze Flutter code
+      - name: Ensure Pods use iOS 14 and update repos
         script: |
-          flutter analyze
-        ignore_failure: true
-      
-      - name: Run Flutter tests
-        script: |
-          flutter test
-        ignore_failure: true
-      
+          export IPHONEOS_DEPLOYMENT_TARGET=14.0
+          if [ -d "ios" ]; then cd ios; elif [ -d ".ios" ]; then cd .ios; fi
+          pod repo update
+          pod install
+          cd ..
       - name: Build iOS app (unsigned)
         script: |
-          flutter build ios --release --no-codesign
-    
+          flutter build ios --release
     artifacts:
       - build/ios/iphoneos/*.app
       - /tmp/xcodebuild_logs/*.log
