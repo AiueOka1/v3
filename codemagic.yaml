@@ -1,0 +1,92 @@
+workflows:
+  ios-workflow:
+    name: iOS Build - Pawtech
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    environment:
+      flutter: stable
+      xcode: latest
+      vars:
+        BUNDLE_ID: "com.example.pawtech" # Change this to your unique bundle ID
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+    scripts:
+      - name: Set up Flutter
+        script: |
+          flutter doctor
+          flutter --version
+      
+      - name: Get Flutter dependencies
+        script: |
+          flutter pub get
+      
+      - name: Analyze Flutter code
+        script: |
+          flutter analyze
+        ignore_failure: true
+      
+      - name: Run Flutter tests
+        script: |
+          flutter test
+        ignore_failure: true
+      
+      - name: Build iOS app (unsigned)
+        script: |
+          flutter build ios --release --no-codesign
+    
+    artifacts:
+      - build/ios/iphoneos/*.app
+      - /tmp/xcodebuild_logs/*.log
+    
+    publishing:
+      email:
+        recipients:
+          - somarious2@gmail.com  # Change to your email
+        notify:
+          success: true
+          failure: true
+
+  # Optional: Android workflow for testing
+  android-workflow:
+    name: Android Build - Pawtech
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      android_signing:
+        - keystore_reference
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+    scripts:
+      - name: Set up Flutter
+        script: |
+          flutter doctor
+          flutter --version
+      
+      - name: Get Flutter dependencies
+        script: |
+          flutter pub get
+      
+      - name: Build Android APK
+        script: |
+          flutter build apk --release
+    
+    artifacts:
+      - build/app/outputs/flutter-apk/app-release.apk
+    
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com  # Change to your email
+        notify:
+          success: true
+          failure: true
