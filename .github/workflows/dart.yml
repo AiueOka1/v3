@@ -5,38 +5,60 @@ on:
 
 jobs:
   build-ios:
-    name: 🎉 iOS Build
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
-          architecture: x64
-      - run: flutter pub get
-      
+          channel: stable
 
-      - run: pod repo update
-        working-directory: ios
+      - name: Get deps
+        run: flutter pub get
 
-      - run: flutter build ios --release --no-codesign
+      - name: Precache iOS
+        run: flutter precache --ios
 
-      - run: mkdir Payload
-        working-directory: build/ios/iphoneos
+      # Optional: bump iOS min version for google_maps_flutter_ios
+      - name: Ensure iOS 14.0 min target (ephemeral .ios)
+        run: |
+          if [ -f ".ios/Podfile" ]; then
+            sed -i '' "s/platform :ios, '.*'/platform :ios, '14.0'/" .ios/Podfile || true
+            printf "\npost_install do |installer|\n  installer.pods_project.targets.each do |t|\n    t.build_configurations.each do |c|\n      c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'\n    end\n  end\nend\n" >> .ios/Podfile
+          fi
 
-      - run: mv Runner.app/ Payload
-        working-directory: build/ios/iphoneos
+      # Do NOT set working-directory: ios (it doesn't exist)
+      - name: Update CocoaPods repo
+        run: pod repo update
 
-      - name: Zip output
-        run: zip -qq -r -9 FlutterIpaExport.ipa Payload
-        working-directory: build/ios/iphoneos
+      # Build for device with codesigning disabled; Flutter may not support --no-codesign on all versions,
+      # so we fall back to xcodebuild if needed.
+      - name: Build iOS (device, unsigned)
+        shell: bash
+        run: |
+          set -e
+          # Try Flutter first (may fail on some versions)
+          if flutter build ios --release --no-codesign; then
+            echo "Flutter build (no-codesign) succeeded"
+          else
+            echo "Flutter no-codesign not supported, using xcodebuild"
+            cd .ios
+            xcodebuild -workspace Runner.xcworkspace \
+              -scheme Runner -configuration Release -sdk iphoneos \
+              -archivePath ../build/Runner.xcarchive archive \
+              CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGNING_IDENTITY="" DEVELOPMENT_TEAM=""
+            cd ..
+          fi
 
-      - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v2
+      - name: Package unsigned IPA
+        run: |
+          cd build/ios/iphoneos
+          rm -rf Payload && mkdir Payload
+          cp -R Runner.app Payload/
+          zip -qry FlutterIpaExport-unsigned.ipa Payload
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/ios/iphoneos/FlutterIpaExport.ipa
-          tag: v1.0
-          overwrite: true
-          body: "This is first release"
+          name: ios-unsigned-ipa
+          path: build/ios/iphoneos/FlutterIpaExport-unsigned.ipa
