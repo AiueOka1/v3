@@ -14,10 +14,14 @@ jobs:
         with:
           channel: 'stable'
           architecture: x64
-      - run: flutter pub get
-      
 
-      - run: pod repo update
+      - run: flutter pub get
+
+      # Ensure ios/ folder exists
+      - run: flutter create .
+        if: ${{ !exists('ios/Runner.xcworkspace') }}
+
+      - run: pod install --repo-update
         working-directory: ios
 
       - run: flutter build ios --release --no-codesign
@@ -25,10 +29,10 @@ jobs:
       - run: mkdir Payload
         working-directory: build/ios/iphoneos
 
-      - run: mv Runner.app/ Payload
+      - run: mv Runner.app Payload/
         working-directory: build/ios/iphoneos
 
-      - name: Zip output
+      - name: Create IPA
         run: zip -qq -r -9 FlutterIpaExport.ipa Payload
         working-directory: build/ios/iphoneos
 
