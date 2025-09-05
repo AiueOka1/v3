@@ -13,23 +13,24 @@ workflows:
           flutter pub get
           flutter precache --ios
 
-      - name: Generate iOS project (.ios)
+      - name: Generate ios/ platform if missing
         script: |
-          flutter build ios --simulator
+          if [ ! -d "ios" ]; then
+            flutter create .
+          fi
 
-      - name: Force iOS 14 in Podfile and install pods
+      - name: Force iOS 14 in ios/Podfile and install pods
         script: |
           set -e
-          cd .ios
           # Ensure platform :ios, '14.0'
-          if grep -q "platform :ios" Podfile; then
-            sed -i '' "s/platform :ios, '.*'/platform :ios, '14.0'/" Podfile
+          if grep -q "platform :ios" ios/Podfile; then
+            sed -i '' "s/platform :ios, '.*'/platform :ios, '14.0'/" ios/Podfile
           else
-            sed -i '' "1s;^;platform :ios, '14.0'\n;" Podfile
+            sed -i '' "1s;^;platform :ios, '14.0'\n;" ios/Podfile
           fi
-          # Ensure post_install forces IPHONEOS_DEPLOYMENT_TARGET
+          # Ensure post_install enforces deployment target
           ruby - <<'RUBY'
-          path = 'Podfile'
+          path = 'ios/Podfile'
           podfile = File.read(path)
           unless podfile.include?("post_install do |installer|")
             File.open(path, 'a') do |f|
@@ -46,19 +47,20 @@ workflows:
             end
           end
           RUBY
+          cd ios
           pod repo update
           pod install
           cd ..
 
-      - name: Build iOS (unsigned)
+      - name: Build (unsigned)
         script: |
           set -e
-          # Try Flutter no-codesign first
+          # Try Flutter unsigned build
           if flutter build ios --release --no-codesign; then
             echo "Flutter build (no-codesign) succeeded"
           else
             echo "Falling back to xcodebuild archive (unsigned)"
-            xcodebuild -workspace .ios/Runner.xcworkspace \
+            xcodebuild -workspace ios/Runner.xcworkspace \
               -scheme Runner -configuration Release -sdk iphoneos \
               -destination "generic/platform=iOS" \
               -archivePath build/Runner-unsigned.xcarchive archive \
@@ -77,4 +79,4 @@ workflows:
           cp -R Runner.app Payload/
           zip -qry Runner-unsigned.ipa Payload
     artifacts:
-      - build/ios/iphoneos/Runner
+      - build/ios/iphoneos/Runner-unsigned.ipa
