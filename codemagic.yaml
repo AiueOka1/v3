@@ -11,12 +11,65 @@ workflows:
         script: |
           flutter --version
           flutter pub get
-      - name: Build iOS (unsigned, no code signing)
+          flutter precache --ios
+
+      - name: Generate iOS project (.ios)
         script: |
-          export CODE_SIGNING_ALLOWED=NO
-          export CODE_SIGNING_REQUIRED=NO
-          export CODE_SIGN_IDENTITY=""
-          flutter build ios --release --no-codesign
+          flutter build ios --simulator
+
+      - name: Force iOS 14 in Podfile and install pods
+        script: |
+          set -e
+          cd .ios
+          # Ensure platform :ios, '14.0'
+          if grep -q "platform :ios" Podfile; then
+            sed -i '' "s/platform :ios, '.*'/platform :ios, '14.0'/" Podfile
+          else
+            sed -i '' "1s;^;platform :ios, '14.0'\n;" Podfile
+          fi
+          # Ensure post_install forces IPHONEOS_DEPLOYMENT_TARGET
+          ruby - <<'RUBY'
+          path = 'Podfile'
+          podfile = File.read(path)
+          unless podfile.include?("post_install do |installer|")
+            File.open(path, 'a') do |f|
+              f.puts <<~EOS
+              post_install do |installer|
+                installer.pods_project.targets.each do |t|
+                  t.build_configurations.each do |c|
+                    c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+                    c.build_settings['ENABLE_BITCODE'] = 'NO'
+                  end
+                end
+              end
+              EOS
+            end
+          end
+          RUBY
+          pod repo update
+          pod install
+          cd ..
+
+      - name: Build iOS (unsigned)
+        script: |
+          set -e
+          # Try Flutter no-codesign first
+          if flutter build ios --release --no-codesign; then
+            echo "Flutter build (no-codesign) succeeded"
+          else
+            echo "Falling back to xcodebuild archive (unsigned)"
+            xcodebuild -workspace .ios/Runner.xcworkspace \
+              -scheme Runner -configuration Release -sdk iphoneos \
+              -destination "generic/platform=iOS" \
+              -archivePath build/Runner-unsigned.xcarchive archive \
+              CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_IDENTITY="" DEVELOPMENT_TEAM="" \
+              PROVISIONING_PROFILE_SPECIFIER=""
+            APP_PATH="build/Runner-unsigned.xcarchive/Products/Applications/Runner.app"
+            mkdir -p build/ios/iphoneos
+            cp -R "$APP_PATH" build/ios/iphoneos/
+          fi
+
       - name: Package unsigned IPA
         script: |
           cd build/ios/iphoneos
@@ -24,4 +77,4 @@ workflows:
           cp -R Runner.app Payload/
           zip -qry Runner-unsigned.ipa Payload
     artifacts:
-      - build/ios/iphoneos/Runner-unsigned.ipa
+      - build/ios/iphoneos/Runner
