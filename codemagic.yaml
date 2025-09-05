@@ -16,7 +16,8 @@ workflows:
       - name: Generate ios/ platform if missing
         script: |
           if [ ! -d "ios" ]; then
-            flutter create .
+            # Pick ONE org (adjust if you prefer another reverse-DNS)
+            flutter create --platforms=ios --org com.aiueoka1 --project-name pawtech .
           fi
 
       - name: Force iOS 14 in ios/Podfile and install pods
