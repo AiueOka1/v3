@@ -1,0 +1,33 @@
+{
+  "flutter": {
+    "platforms": {
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "pawtech-7bb7e",
+          "configurations": {
+            "android": "1:344777508873:android:5c04d6ccd2b2d66411d0d8",
+            "ios": "1:344777508873:ios:de89dd6efa43005211d0d8"
+          }
+        }
+      }
+    }
+  },
+  "functions": {
+    "predeploy": [
+      "npm --prefix functions run predeploy"
+    ],
+    "source": "functions",
+    "runtime": "nodejs18"
+  },
+  "emulators": {
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": true
+    }
+  }
+}
