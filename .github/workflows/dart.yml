@@ -56,6 +56,19 @@ jobs:
       - name: Precache iOS
         run: flutter precache --ios
 
+      - name: Install iOS runtime and setup
+        run: |
+          # Accept Xcode license
+          sudo xcodebuild -license accept || true
+          
+          # Check what iOS runtimes are available
+          echo "=== iOS Platforms Available ==="
+          xcodebuild -showsdks
+          
+          # List simulators to see what's installed
+          echo "=== iOS Simulators ==="
+          xcrun simctl list runtimes | grep iOS || echo "No iOS simulators found"
+
       - name: Set iOS min version to 15.0 (Podfile and project)
         run: |
           if [ -f ".ios/Podfile" ]; then
@@ -83,46 +96,45 @@ jobs:
         run: |
           set -e
           
-          # Find available iOS SDK - prefer iOS 17.x for better compatibility
+          # Find available iOS SDK - use whatever is available
           AVAILABLE_SDKS=$(xcodebuild -showsdks | grep "iphoneos")
           echo "Available SDKs: $AVAILABLE_SDKS"
           
-          # Try to find iOS 17.x first, then fall back to latest
-          PREFERRED_SDK=$(echo "$AVAILABLE_SDKS" | grep "iphoneos17" | tail -1 | sed 's/.*iphoneos/iphoneos/' | tr -d '[:space:]')
-          if [ -z "$PREFERRED_SDK" ]; then
-            PREFERRED_SDK=$(echo "$AVAILABLE_SDKS" | tail -1 | sed 's/.*iphoneos/iphoneos/' | tr -d '[:space:]')
-          fi
+          # Extract the actual SDK version that's available
+          PREFERRED_SDK=$(echo "$AVAILABLE_SDKS" | head -1 | awk '{print $NF}' | sed 's/-sdk//')
           
           echo "Using iOS SDK: $PREFERRED_SDK"
           
-          # Try Flutter build first with explicit targeting
-          export FLUTTER_BUILD_MODE=release
-          if flutter build ios --release --no-codesign --verbose; then
-            echo "Flutter build succeeded"
-          else
-            echo "Flutter build failed, using direct xcodebuild"
-            cd .ios
-            
-            # Use a more compatible build approach
-            xcodebuild clean -workspace Runner.xcworkspace -scheme Runner -configuration Release
-            
-            xcodebuild archive \
-              -workspace Runner.xcworkspace \
-              -scheme Runner \
-              -configuration Release \
-              -sdk $PREFERRED_SDK \
-              -archivePath ../build/Runner.xcarchive \
-              -allowProvisioningUpdates \
-              CODE_SIGNING_ALLOWED=NO \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGNING_IDENTITY="" \
-              DEVELOPMENT_TEAM="" \
-              IPHONEOS_DEPLOYMENT_TARGET=15.0 \
-              ONLY_ACTIVE_ARCH=NO \
-              VALID_ARCHS="arm64" \
-              ARCHS="arm64"
-            cd ..
-          fi
+          # Use direct xcodebuild approach since Flutter build keeps failing
+          cd .ios
+          
+          # Clean first
+          xcodebuild clean \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release
+          
+          # Build the archive
+          xcodebuild archive \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk $PREFERRED_SDK \
+            -archivePath ../build/Runner.xcarchive \
+            -destination "generic/platform=iOS" \
+            -allowProvisioningUpdates \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
+            ONLY_ACTIVE_ARCH=NO \
+            VALID_ARCHS="arm64" \
+            ARCHS="arm64" \
+            ENABLE_BITCODE=NO
+          
+          cd ..
+          echo "Build completed successfully"
 
       - name: Package unsigned IPA
         shell: bash
