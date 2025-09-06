@@ -5,9 +5,26 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Select latest Xcode version
+        run: |
+          # List available Xcode versions and select the latest
+          ls /Applications/ | grep Xcode
+          # Use Xcode 16.x if available, otherwise fall back to latest available
+          if [ -d "/Applications/Xcode_16.1.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+          else
+            # Find the highest version Xcode available
+            LATEST_XCODE=$(ls /Applications/ | grep "Xcode_" | sort -V | tail -1)
+            echo "Using $LATEST_XCODE"
+            sudo xcode-select -s /Applications/$LATEST_XCODE/Contents/Developer
+          fi
+          xcode-select -p
 
       - uses: subosito/flutter-action@v2
         with:
@@ -15,6 +32,15 @@ jobs:
 
       - name: Flutter pub get
         run: flutter pub get
+
+      - name: Show build environment info
+        run: |
+          echo "=== Build Environment ==="
+          xcode-select -p
+          xcodebuild -version
+          swift --version
+          flutter --version
+          echo "========================="
 
       - name: Precache iOS
         run: flutter precache --ios
