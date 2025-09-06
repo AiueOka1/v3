@@ -40,6 +40,10 @@ jobs:
           xcodebuild -version
           swift --version
           flutter --version
+          echo "=== Available iOS SDKs ==="
+          xcodebuild -showsdks | grep iOS
+          echo "=== Available Destinations ==="
+          xcodebuild -workspace .ios/Runner.xcworkspace -scheme Runner -showdestinations | head -20
           echo "========================="
 
       - name: Precache iOS
@@ -64,15 +68,32 @@ jobs:
         shell: bash
         run: |
           set -e
-          if flutter build ios --release --no-codesign; then
+          
+          # Find available iOS SDK
+          AVAILABLE_SDK=$(xcodebuild -showsdks | grep "iphoneos" | tail -1 | sed 's/.*iphoneos/iphoneos/')
+          echo "Using iOS SDK: $AVAILABLE_SDK"
+          
+          # Try Flutter build first
+          if flutter build ios --release --no-codesign --verbose; then
             echo "Flutter build (no-codesign) succeeded"
           else
-            echo "Flutter no-codesign not supported, using xcodebuild"
+            echo "Flutter build failed, using xcodebuild with specific destination"
             cd .ios
+            
+            # Build for generic iOS device without requiring specific iOS version
             xcodebuild -workspace Runner.xcworkspace \
-              -scheme Runner -configuration Release -sdk iphoneos \
-              -archivePath ../build/Runner.xcarchive archive \
-              CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGNING_IDENTITY="" DEVELOPMENT_TEAM=""
+              -scheme Runner \
+              -configuration Release \
+              -sdk $AVAILABLE_SDK \
+              -destination "generic/platform=iOS" \
+              -archivePath ../build/Runner.xcarchive \
+              archive \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_IDENTITY="" \
+              DEVELOPMENT_TEAM="" \
+              IPHONEOS_DEPLOYMENT_TARGET=15.0 \
+              ONLY_ACTIVE_ARCH=NO
             cd ..
           fi
 
