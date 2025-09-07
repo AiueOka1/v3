@@ -8,6 +8,7 @@ import 'package:pawtech/providers/geofence_provider.dart';
 import 'package:pawtech/providers/alert_provider.dart';
 import 'package:pawtech/screens/dog/dog_nfc_screen.dart';
 import 'package:pawtech/screens/dog/dog_share_screen.dart';
+import 'package:pawtech/widgets/smart_image.dart';
 
 class DogDetailsScreen extends StatefulWidget {
   final String dogId;
@@ -85,9 +86,9 @@ class _DogDetailsScreenState extends State<DogDetailsScreen>
               children: [
                 Hero(
                   tag: 'dog_image_${dog.id}',
-                  child: CircleAvatar(
+                  child: SmartCircleAvatar(
                     radius: 40,
-                    backgroundImage: NetworkImage(dog.imageUrl),
+                    imagePath: dog.imageUrl,
                   ),
                 ),
                 const SizedBox(width: 16),

@@ -5,6 +5,7 @@ import 'package:pawtech/providers/dog_provider.dart';
 import 'package:pawtech/providers/auth_provider.dart';
 import 'package:pawtech/widgets/custom_button.dart';
 import 'package:pawtech/widgets/custom_text_field.dart';
+import 'package:pawtech/services/image_storage_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
@@ -105,14 +106,22 @@ class _AddDogScreenState extends State<AddDogScreen> {
         final dogProvider = Provider.of<DogProvider>(context, listen: false);
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         
-        // In a real app, you would upload the image to storage and get a URL
-        // For this demo, we'll use a placeholder image if none is selected
-        final imageUrl = _imageFile != null 
-            ? 'file://${_imageFile!.path}' // This would be a cloud storage URL in a real app
-            : 'https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60';
+        // Generate dog ID first
+        final dogId = 'dog_${DateTime.now().millisecondsSinceEpoch}';
+        
+        // Save image to permanent storage if one was selected
+        String imageUrl;
+        if (_imageFile != null) {
+          // Save image to permanent storage and get the permanent path
+          final permanentImagePath = await ImageStorageService.saveImageToPermanentStorage(_imageFile!, dogId);
+          imageUrl = permanentImagePath;
+        } else {
+          // Use placeholder image if no image was selected
+          imageUrl = 'https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60';
+        }
         
         final newDog = Dog(
-          id: 'dog_${DateTime.now().millisecondsSinceEpoch}',
+          id: dogId,
           name: _nameController.text.trim(),
           breed: _breedController.text.trim(),
           imageUrl: imageUrl,

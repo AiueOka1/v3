@@ -2,9 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pawtech/providers/auth_provider.dart';
 import 'package:pawtech/widgets/profile_menu_item.dart';
+import 'package:pawtech/screens/auth/login_screen.dart';
+import 'package:pawtech/screens/profile/edit_profile_screen.dart';
+import 'package:pawtech/screens/profile/change_password_screen.dart';
+import 'package:pawtech/widgets/smart_image.dart';
 
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
+
+  Future<void> _logout(BuildContext context) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await authProvider.logout();
+
+    if (context.mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,9 +31,9 @@ class ProfileTab extends StatelessWidget {
       child: Column(
         children: [
           const SizedBox(height: 16),
-          CircleAvatar(
+          SmartCircleAvatar(
             radius: 50,
-            backgroundImage: NetworkImage(user?.profileImageUrl ?? 'https://ui-avatars.com/api/?name=User'),
+            imagePath: user?.profileImageUrl ?? 'https://ui-avatars.com/api/?name=User',
           ),
           const SizedBox(height: 16),
           Text(
@@ -64,7 +79,11 @@ class ProfileTab extends StatelessWidget {
                   icon: Icons.person,
                   title: 'Edit Profile',
                   onTap: () {
-                    // Navigate to edit profile screen
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const EditProfileScreen(),
+                      ),
+                    );
                   },
                 ),
                 const Divider(height: 1),
@@ -91,29 +110,19 @@ class ProfileTab extends StatelessWidget {
             margin: EdgeInsets.zero,
             child: Column(
               children: [
-                ProfileMenuItem(
-                  icon: Icons.notifications,
-                  title: 'Notification Settings',
-                  onTap: () {
-                    // Navigate to notifications screen
-                  },
-                ),
                 const Divider(height: 1),
                 ProfileMenuItem(
                   icon: Icons.security,
                   title: 'Security',
                   onTap: () {
-                    // Navigate to security screen
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const ChangePasswordScreen(),
+                      ),
+                    );
                   },
                 ),
                 const Divider(height: 1),
-                ProfileMenuItem(
-                  icon: Icons.help,
-                  title: 'Help & Support',
-                  onTap: () {
-                    // Navigate to help screen
-                  },
-                ),
               ],
             ),
           ),
@@ -175,7 +184,7 @@ class ProfileTab extends StatelessWidget {
                     TextButton(
                       onPressed: () {
                         Navigator.of(ctx).pop();
-                        authProvider.logout();
+                        _logout(context); // Use the new _logout method
                       },
                       child: const Text('Logout'),
                     ),

@@ -131,37 +131,30 @@ class DogProvider with ChangeNotifier {
   }
 
   Future<void> updateDogStatus(String dogId, bool isActive) async {
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      try {
-        final dogIndex = _dogs.indexWhere((dog) => dog.id == dogId);
-        if (dogIndex == -1) {
-          throw Exception('Dog not found');
-        }
+    _isLoading = true;
+    _error = null;
+    
+    try {
+      // Update the status in Firestore first
+      await FirebaseFirestore.instance
+          .collection('dogs')
+          .doc(dogId)
+          .update({'isActive': isActive});
 
-        final updatedDog = Dog(
-          id: _dogs[dogIndex].id,
-          name: _dogs[dogIndex].name,
-          breed: _dogs[dogIndex].breed,
-          imageUrl: _dogs[dogIndex].imageUrl,
-          handlerId: _dogs[dogIndex].handlerId,
-          handlerName: _dogs[dogIndex].handlerName,
-          specialization: _dogs[dogIndex].specialization,
-          trainingLevel: _dogs[dogIndex].trainingLevel,
-          lastKnownLocation: _dogs[dogIndex].lastKnownLocation,
-          isActive: isActive,
-          nfcTagId: _dogs[dogIndex].nfcTagId,
-          department: _dogs[dogIndex].department,
-          medicalInfo: _dogs[dogIndex].medicalInfo,
-          emergencyContact: _dogs[dogIndex].emergencyContact,
-        );
-
-        _dogs[dogIndex] = updatedDog;
-      } catch (e) {
-        _error = e.toString();
+      // Then update the local state
+      final dogIndex = _dogs.indexWhere((dog) => dog.id == dogId);
+      if (dogIndex == -1) {
+        throw Exception('Dog not found');
       }
 
-      notifyListeners();
-    });
+      final updatedDog = _dogs[dogIndex].copyWith(isActive: isActive);
+      _dogs[dogIndex] = updatedDog;
+    } catch (e) {
+      _error = e.toString();
+    }
+
+    _isLoading = false;
+    notifyListeners();
   }
 
   Dog? getDogById(String id) {

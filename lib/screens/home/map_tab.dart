@@ -188,6 +188,13 @@ class _MapTabState extends State<MapTab> {
   @override
   Widget build(BuildContext context) {
     final dogs = context.watch<DogProvider>().dogs;
+    final activeDogs = dogs.where((dog) => dog.isActive).toList();
+    
+    // Reset selected dog if it becomes inactive
+    if (_selectedDogId != null && 
+        !activeDogs.any((dog) => dog.id == _selectedDogId)) {
+      _selectedDogId = null;
+    }
 
     return Column(
       children: [
@@ -211,9 +218,9 @@ class _MapTabState extends State<MapTab> {
                   items: [
                     const DropdownMenuItem<String?>(
                       value: null,
-                      child: Text('All Dogs'),
+                      child: Text('All Active Dogs'),
                     ),
-                    ...dogs.map(
+                    ...activeDogs.map(
                       (dog) => DropdownMenuItem<String?>(
                         value: dog.id,
                         child: Text(dog.name),
@@ -270,8 +277,8 @@ class _MapTabState extends State<MapTab> {
               RealMapView(
                 selectedDogId: _selectedDogId,
                 dogs: _selectedDogId == null
-                    ? dogs
-                    : dogs.where((dog) => dog.id == _selectedDogId).toList(),
+                    ? activeDogs
+                    : activeDogs.where((dog) => dog.id == _selectedDogId).toList(),
                 geofences: [], // 🛠 FIX: Pass empty list for now
                 geofenceLocation: _geofenceLocation,
                 geofenceRadius: _geofenceRadius,

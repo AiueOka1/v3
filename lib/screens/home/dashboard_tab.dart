@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:pawtech/models/dog.dart';
 import 'package:pawtech/providers/auth_provider.dart';
 import 'package:pawtech/providers/dog_provider.dart';
-import 'package:pawtech/providers/geofence_provider.dart';
 import 'package:pawtech/providers/alert_provider.dart';
 import 'package:pawtech/widgets/dog_status_card.dart';
 import 'package:pawtech/widgets/stats_card.dart';
@@ -25,18 +24,16 @@ class DashboardTab extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: () async {
         final dogProvider = Provider.of<DogProvider>(context, listen: false);
-        final geofenceProvider = Provider.of<GeofenceProvider>(context, listen: false);
         final alertProvider = Provider.of<AlertProvider>(context, listen: false);
         
         await dogProvider.fetchDogs();
-        await geofenceProvider.fetchGeofences();
         await alertProvider.fetchAlerts();
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
-        child: Consumer4<AuthProvider, DogProvider, GeofenceProvider, AlertProvider>(
-          builder: (context, authProvider, dogProvider, geofenceProvider, alertProvider, child) {
+        child: Consumer3<AuthProvider, DogProvider, AlertProvider>(
+          builder: (context, authProvider, dogProvider, alertProvider, child) {
             final user = authProvider.currentUser;
             final dogs = dogProvider.dogs;
             final activeDogs = dogs.where((dog) => dog.isActive).toList();
@@ -86,21 +83,14 @@ class DashboardTab extends StatelessWidget {
                   children: [
                     Expanded(
                       child: StatsCard(
-                        title: 'Geofences',
-                        value: geofenceProvider.geofences.length.toString(),
-                        icon: Icons.location_on,
-                        color: Colors.green,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: StatsCard(
                         title: 'Alerts',
                         value: alertProvider.unreadCount.toString(),
                         icon: Icons.notifications,
                         color: Colors.orange,
                       ),
                     ),
+                    const SizedBox(width: 16),
+                    const Expanded(child: SizedBox()), // Empty space to maintain layout
                   ],
                 ),
                 const SizedBox(height: 32),

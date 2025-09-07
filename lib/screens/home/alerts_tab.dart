@@ -43,11 +43,14 @@ class _AlertsTabState extends State<AlertsTab> with SingleTickerProviderStateMix
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Alerts & Notifications',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).primaryColor,
+                  Flexible(
+                    child: Text(
+                      'Alerts & Notifications',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                      overflow: TextOverflow.ellipsis, // Add this to handle very long text
                     ),
                   ),
                   if (unreadAlerts.isNotEmpty)

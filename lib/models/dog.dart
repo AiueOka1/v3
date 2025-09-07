@@ -51,6 +51,7 @@ class Dog {
       department: json['department'],
       medicalInfo: json['medicalInfo'],
       emergencyContact: json['emergencyContact'],
+      deviceId: json['deviceId'], // Include deviceId
     );
   }
 
@@ -71,6 +72,7 @@ class Dog {
       department: data['department'],
       medicalInfo: data['medicalInfo'],
       emergencyContact: data['emergencyContact'],
+      deviceId: data['deviceId'], // Make sure this is included
     );
   }
 
@@ -90,6 +92,7 @@ class Dog {
       'department': department,
       'medicalInfo': medicalInfo,
       'emergencyContact': emergencyContact,
+      'deviceId': deviceId, // Include deviceId in JSON
     };
   }
 

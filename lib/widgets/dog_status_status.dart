@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pawtech/models/dog.dart';
 import 'package:pawtech/screens/dog/dog_details_screen.dart';
+import 'package:pawtech/widgets/smart_image.dart';
 
 class DogStatusCard extends StatelessWidget {
   final Dog dog;
@@ -12,22 +13,6 @@ class DogStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lastLocation = dog.lastKnownLocation;
-    final lastUpdateTime = DateTime.parse(lastLocation['timestamp'] as String);
-    final now = DateTime.now();
-    final difference = now.difference(lastUpdateTime);
-    
-    String timeAgo;
-    if (difference.inMinutes < 1) {
-      timeAgo = 'Just now';
-    } else if (difference.inMinutes < 60) {
-      timeAgo = '${difference.inMinutes} min ago';
-    } else if (difference.inHours < 24) {
-      timeAgo = '${difference.inHours} hours ago';
-    } else {
-      timeAgo = '${difference.inDays} days ago';
-    }
-
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
@@ -45,9 +30,9 @@ class DogStatusCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
+                  SmartCircleAvatar(
                     radius: 25,
-                    backgroundImage: NetworkImage(dog.imageUrl),
+                    imagePath: dog.imageUrl,
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -71,39 +56,18 @@ class DogStatusCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: dog.isActive
+                          ? Colors.green.withOpacity(0.1)
+                          : Colors.red.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text(
-                      'Active',
+                    child: Text(
+                      dog.isActive ? 'Active' : 'Inactive',
                       style: TextStyle(
-                        color: Colors.green,
+                        color: dog.isActive ? Colors.green : Colors.red,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.location_on,
-                    size: 16,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Last location: Caloocan City',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                  Text(
-                    timeAgo,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],

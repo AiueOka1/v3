@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:pawtech/models/dog.dart';
+import 'package:pawtech/providers/dog_provider.dart';
+import 'package:pawtech/widgets/smart_image.dart';
 
 class DogListItem extends StatelessWidget {
   final Dog dog;
@@ -10,6 +13,88 @@ class DogListItem extends StatelessWidget {
     required this.dog,
     required this.onTap,
   });
+
+  Future<void> _assignDevice(
+    BuildContext context,
+    String dogId,
+    String deviceId,
+  ) async {
+    final dogProvider = Provider.of<DogProvider>(context, listen: false);
+
+    final errorMessage = await dogProvider.assignDeviceToDog(dogId, deviceId);
+
+    if (errorMessage != null) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Error'),
+          content: Text(errorMessage),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Device assigned successfully!')),
+      );
+    }
+  }
+
+  Future<void> _showAssignDeviceDialog(
+    BuildContext context,
+    String dogId,
+  ) async {
+    final TextEditingController deviceIdController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Assign GPS Device'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: deviceIdController,
+                decoration: const InputDecoration(
+                  labelText: 'Enter Device ID',
+                  hintText: 'e.g., DEVICE###',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final deviceId = deviceIdController.text.trim();
+
+                if (deviceId.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Device ID cannot be empty')),
+                  );
+                  return;
+                }
+
+                Navigator.of(ctx).pop();
+                _assignDevice(context, dogId, deviceId);
+              },
+              child: const Text('Assign'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,9 +109,9 @@ class DogListItem extends StatelessWidget {
             children: [
               Hero(
                 tag: 'dog_image_${dog.id}',
-                child: CircleAvatar(
+                child: SmartCircleAvatar(
                   radius: 30,
-                  backgroundImage: NetworkImage(dog.imageUrl),
+                  imagePath: dog.imageUrl,
                 ),
               ),
               const SizedBox(width: 16),
@@ -84,6 +169,62 @@ class DogListItem extends StatelessWidget {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    // GPS status or add GPS button
+                    if (dog.deviceId != null && dog.deviceId!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.gps_fixed, size: 14, color: Colors.green[700]),
+                            const SizedBox(width: 4),
+                            Text(
+                              'GPS Connected',
+                              style: TextStyle(
+                                color: Colors.green[700],
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      InkWell(
+                        onTap: () => _showAssignDeviceDialog(context, dog.id),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.add,
+                                size: 14,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Add GPS',
+                                style: TextStyle(
+                                  color: Theme.of(context).primaryColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

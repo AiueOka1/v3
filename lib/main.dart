@@ -7,6 +7,7 @@ import 'package:pawtech/providers/alert_provider.dart';
 import 'package:pawtech/screens/splash_screen.dart';
 import 'package:pawtech/screens/home/home_screen.dart';
 import 'package:pawtech/services/fcm_service.dart';
+import 'package:pawtech/services/image_storage_service.dart';
 import 'package:pawtech/theme/app_theme.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -47,6 +48,9 @@ class _MyAppState extends State<MyApp> {
     FcmService.initialize(onOpenAlerts: () {
       HomeScreen.homeScreenKey.currentState?.changeTab(3);
     });
+    
+    // Clean up old images periodically
+    ImageStorageService.cleanupOldImages();
   }
 
   @override

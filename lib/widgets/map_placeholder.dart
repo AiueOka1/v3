@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui' as ui;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pawtech/models/dog.dart';
 import 'package:pawtech/models/geofence.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:pawtech/providers/alert_provider.dart';
@@ -120,6 +122,9 @@ class _RealMapViewState extends State<RealMapView> {
   DateTime _lastRealtimeUpdate = DateTime.fromMillisecondsSinceEpoch(0);
   final Map<String, bool> _dogInGeofenceStatus = {};
   final Map<String, bool> _dogNearBoundaryStatus = {};
+  
+  // Cache for custom dog icons to improve performance
+  final Map<String, BitmapDescriptor> _iconCache = {};
 
   // Time filter state
   TimeFilterPreset _timeFilter = TimeFilterPreset.last6h;
@@ -495,6 +500,96 @@ class _RealMapViewState extends State<RealMapView> {
     _rebuildFromCache();
   }
 
+  // Create a custom dog icon for the map marker
+  Future<BitmapDescriptor> _createDogIcon(Color color, bool isSelected) async {
+    try {
+      final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+      final Canvas canvas = Canvas(pictureRecorder);
+      const double size = 160.0; // Increased overall size even more
+
+      // Draw shadow effect
+      final Paint shadowPaint = Paint()
+        ..color = Colors.black.withOpacity(0.3)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+      
+      // Create teardrop/pin shape with shadow
+      final Path shadowPath = Path();
+      const double centerX = size / 2 + 1;
+      const double centerY = size / 2 - 8 + 1; // Adjusted for larger size
+      const double radius = 40.0; // Increased radius even more
+      
+      // Draw circle part of the teardrop
+      shadowPath.addOval(Rect.fromCircle(center: Offset(centerX, centerY), radius: radius));
+      // Add the pointed bottom
+      shadowPath.moveTo(centerX, centerY + radius);
+      shadowPath.lineTo(centerX - 14, centerY + radius + 24); // Scaled up more
+      shadowPath.lineTo(centerX + 14, centerY + radius + 24);
+      shadowPath.close();
+      canvas.drawPath(shadowPath, shadowPaint);
+
+      // Create main teardrop/pin shape
+      final Paint bgPaint = Paint()
+        ..color = isSelected ? Colors.blue : Colors.orange
+        ..style = PaintingStyle.fill;
+      
+      final Path mainPath = Path();
+      const double mainCenterX = size / 2;
+      const double mainCenterY = size / 2 - 8; // Adjusted for larger size
+      
+      // Draw circle part of the teardrop
+      mainPath.addOval(Rect.fromCircle(center: Offset(mainCenterX, mainCenterY), radius: radius));
+      // Add the pointed bottom triangle
+      mainPath.moveTo(mainCenterX, mainCenterY + radius);
+      mainPath.lineTo(mainCenterX - 14, mainCenterY + radius + 24); // Scaled up more
+      mainPath.lineTo(mainCenterX + 14, mainCenterY + radius + 24);
+      mainPath.close();
+      canvas.drawPath(mainPath, bgPaint);
+
+      // Draw white border around the entire shape
+      final Paint borderPaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 6.0; // Even thicker border
+      canvas.drawPath(mainPath, borderPaint);
+
+      // Draw dog paw print icon in the circular part
+      final Paint iconPaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.fill;
+      
+      // Main pad (oval) - positioned in the circular area - scaled up even more
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(mainCenterX, mainCenterY + 3),
+          width: 34, // Increased from 30
+          height: 25, // Increased from 22
+        ),
+        iconPaint,
+      );
+
+      // Four toe pads (circles) - arranged like a real paw in the circular area - scaled up even more
+      const double toeRadius = 8.0; // Increased from 7.0
+      canvas.drawCircle(Offset(mainCenterX - 16, mainCenterY - 9), toeRadius, iconPaint); // Adjusted positions
+      canvas.drawCircle(Offset(mainCenterX + 16, mainCenterY - 9), toeRadius, iconPaint);
+      canvas.drawCircle(Offset(mainCenterX - 7, mainCenterY - 17), toeRadius, iconPaint);
+      canvas.drawCircle(Offset(mainCenterX + 7, mainCenterY - 17), toeRadius, iconPaint);
+
+      final ui.Picture picture = pictureRecorder.endRecording();
+      final ui.Image image = await picture.toImage(size.round(), size.round());
+      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final Uint8List uint8List = byteData!.buffer.asUint8List();
+
+      return BitmapDescriptor.fromBytes(uint8List);
+    } catch (e) {
+      // Fallback to colored default markers if custom icon creation fails
+      if (isSelected) {
+        return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue);
+      } else {
+        return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
+      }
+    }
+  }
+
   void _rebuildFromCache() {
     if (_lastDbValue == null) return;
     _rebuildFromRaw(_lastDbValue);
@@ -519,10 +614,12 @@ class _RealMapViewState extends State<RealMapView> {
 
     final currentUserId = FirebaseAuth.instance.currentUser!.uid;
     final userDogs = widget.dogs.where((dog) => dog.handlerId == currentUserId).toList();
-    final userDogIds = userDogs.map((dog) => dog.id).toSet();
+    // Only include active dogs on the map
+    final activeDogs = userDogs.where((dog) => dog.isActive).toList();
+    final activeDogIds = activeDogs.map((dog) => dog.id).toSet();
 
     final Map<String, String> dogNameById = {
-      for (final d in userDogs) d.id: (d.name.trim().isNotEmpty ? d.name.trim() : 'Unknown Dog'),
+      for (final d in activeDogs) d.id: (d.name.trim().isNotEmpty ? d.name.trim() : 'Unknown Dog'),
     };
 
     final Map<String, Marker> newMarkers = {};
@@ -536,7 +633,7 @@ class _RealMapViewState extends State<RealMapView> {
       if (deviceData is! Map) continue;
 
       final dogId = deviceData['dogId'] as String?;
-      if (dogId == null || !userDogIds.contains(dogId)) continue;
+      if (dogId == null || !activeDogIds.contains(dogId)) continue;
 
       _deviceLastSeen[deviceId as String] = DateTime.now();
       validDeviceIds.add(deviceId as String);
@@ -604,16 +701,27 @@ class _RealMapViewState extends State<RealMapView> {
         });
       } catch (_) {}
 
-      final dog = userDogs.firstWhere((d) => d.id == dogId, orElse: () => Dog.empty());
+      final dog = activeDogs.firstWhere((d) => d.id == dogId, orElse: () => Dog.empty());
       final displayDogName = dogNameById[dogId] ?? 'Unknown Dog';
+
+      // Create custom dog icon with appropriate color (using cache for performance)
+      final markerColor = widget.selectedDogId == dogId ? Colors.blue : Colors.red;
+      final isSelected = widget.selectedDogId == dogId;
+      final cacheKey = '${markerColor.value}_$isSelected';
+      
+      BitmapDescriptor dogIcon;
+      if (_iconCache.containsKey(cacheKey)) {
+        dogIcon = _iconCache[cacheKey]!;
+      } else {
+        dogIcon = await _createDogIcon(markerColor, isSelected);
+        _iconCache[cacheKey] = dogIcon;
+      }
 
       newMarkers[deviceId as String] = Marker(
         markerId: MarkerId(deviceId as String),
         position: LatLng(latestLat, latestLon),
         infoWindow: InfoWindow(title: dog.name.isNotEmpty ? dog.name : 'Unknown Dog', snippet: dogId),
-        icon: BitmapDescriptor.defaultMarkerWithHue(
-          widget.selectedDogId == dogId ? BitmapDescriptor.hueAzure : BitmapDescriptor.hueRed,
-        ),
+        icon: dogIcon,
       );
 
       if (pathPoints.length >= 2) {
@@ -848,7 +956,7 @@ class _RealMapViewState extends State<RealMapView> {
         // Info card overlay
         if (_selectedCircleId != null && _circleInfo[_selectedCircleId!] != null)
           Positioned(
-            top: 24, // move near top
+            top: 80, // moved lower to avoid time filter overlap
             left: 16,
             right: 16,
             child: SafeArea(
@@ -869,7 +977,7 @@ class _RealMapViewState extends State<RealMapView> {
                           return Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.place, color: Colors.red, size: 18),
+                              const Icon(Icons.pets, color: Colors.orange, size: 18),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Column(

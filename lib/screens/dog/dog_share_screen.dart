@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:pawtech/models/dog.dart';
 import 'package:pawtech/providers/dog_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:pawtech/widgets/smart_image.dart';
 
 class DogShareScreen extends StatefulWidget {
   final Dog dog;
@@ -55,9 +56,9 @@ class _DogShareScreenState extends State<DogShareScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            CircleAvatar(
+            SmartCircleAvatar(
               radius: 50,
-              backgroundImage: NetworkImage(widget.dog.imageUrl),
+              imagePath: widget.dog.imageUrl,
             ),
             const SizedBox(height: 16),
             Text(
