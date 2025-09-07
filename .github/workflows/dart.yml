@@ -45,13 +45,7 @@ jobs:
           echo "=== Build Environment ==="
           xcode-select -p
           xcodebuild -version
-          swift --version
           flutter --version
-          echo "=== Available iOS SDKs ==="
-          xcodebuild -showsdks | grep iOS
-          echo "=== Available Destinations ==="
-          xcodebuild -workspace .ios/Runner.xcworkspace -scheme Runner -showdestinations | head -20
-          echo "========================="
 
       - name: Precache iOS
         run: flutter precache --ios
@@ -60,14 +54,6 @@ jobs:
         run: |
           # Accept Xcode license
           sudo xcodebuild -license accept || true
-          
-          # Check what iOS runtimes are available
-          echo "=== iOS Platforms Available ==="
-          xcodebuild -showsdks
-          
-          # List simulators to see what's installed
-          echo "=== iOS Simulators ==="
-          xcrun simctl list runtimes | grep iOS || echo "No iOS simulators found"
 
       - name: Set iOS min version to 15.0 (Podfile and project)
         run: |
@@ -88,7 +74,6 @@ jobs:
       - name: CocoaPods install
         run: |
           cd .ios
-          pod repo update
           pod install
 
       - name: Build iOS (device, unsigned)
@@ -96,59 +81,21 @@ jobs:
         run: |
           set -e
           
-          # Find available iOS SDK - use whatever is available
-          AVAILABLE_SDKS=$(xcodebuild -showsdks | grep "iphoneos")
-          echo "Available SDKs: $AVAILABLE_SDKS"
+          # Use Flutter build which is more efficient
+          flutter build ios --no-codesign --release --verbose
           
-          # Extract the actual SDK version that's available
-          PREFERRED_SDK=$(echo "$AVAILABLE_SDKS" | head -1 | awk '{print $NF}' | sed 's/-sdk//')
-          
-          echo "Using iOS SDK: $PREFERRED_SDK"
-          
-          # Use direct xcodebuild approach since Flutter build keeps failing
-          cd .ios
-          
-          # Clean first
-          xcodebuild clean \
-            -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release
-          
-          # Build the archive
-          xcodebuild archive \
-            -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk $PREFERRED_SDK \
-            -archivePath ../build/Runner.xcarchive \
-            -destination "generic/platform=iOS" \
-            -allowProvisioningUpdates \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
-            ONLY_ACTIVE_ARCH=NO \
-            VALID_ARCHS="arm64" \
-            ARCHS="arm64" \
-            ENABLE_BITCODE=NO
-          
-          cd ..
           echo "Build completed successfully"
 
       - name: Package unsigned IPA
         shell: bash
         run: |
           set -euo pipefail
-          # Locate the built .app (Flutter vs xcodebuild fallback)
-          APP_DIR=""
-          if [ -d "build/ios/iphoneos/Runner.app" ]; then
-            APP_DIR="build/ios/iphoneos/Runner.app"
-          elif [ -d "build/Runner.xcarchive/Products/Applications/Runner.app" ]; then
-            APP_DIR="build/Runner.xcarchive/Products/Applications/Runner.app"
-          else
-            echo "Runner.app not found in expected locations."
-            find build -maxdepth 4 -type d -name "Runner.app" || true
+          # Flutter build creates the app in build/ios/iphoneos/
+          APP_DIR="build/ios/iphoneos/Runner.app"
+          
+          if [ ! -d "$APP_DIR" ]; then
+            echo "Runner.app not found at expected location: $APP_DIR"
+            find build -name "Runner.app" -type d || true
             exit 1
           fi
 
@@ -162,6 +109,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-unsigned-ipa
-          path: |
-            build/ios/iphoneos/FlutterIpaExport-unsigned.ipa
-            build/Runner.xcarchive/Products/Applications/FlutterIpaExport-unsigned.ipa
+          path: build/ios/iphoneos/FlutterIpaExport-unsigned.ipa
