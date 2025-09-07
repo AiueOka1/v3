@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:pawtech/models/dog.dart';
 import 'package:pawtech/providers/dog_provider.dart';
 import 'package:pawtech/widgets/smart_image.dart';
+import 'package:pawtech/screens/dog/medical_info_screen.dart';
 
 class DogListItem extends StatelessWidget {
   final Dog dog;
@@ -96,6 +97,14 @@ class DogListItem extends StatelessWidget {
     );
   }
 
+  Future<void> _showMedicalInfo(BuildContext context) async {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => MedicalInfoScreen(dog: dog),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -170,61 +179,100 @@ class DogListItem extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    // GPS status or add GPS button
-                    if (dog.deviceId != null && dog.deviceId!.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.gps_fixed, size: 14, color: Colors.green[700]),
-                            const SizedBox(width: 4),
-                            Text(
-                              'GPS Connected',
-                              style: TextStyle(
-                                color: Colors.green[700],
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
+                    // GPS status and Medical info buttons
+                    Wrap(
+                      spacing: 8.0,
+                      runSpacing: 4.0,
+                      children: [
+                        // GPS Status/Button
+                        if (dog.deviceId != null && dog.deviceId!.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.gps_fixed, size: 12, color: Colors.green[700]),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'GPS',
+                                  style: TextStyle(
+                                    color: Colors.green[700],
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          InkWell(
+                            onTap: () => _showAssignDeviceDialog(context, dog.id),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.add,
+                                    size: 12,
+                                    color: Theme.of(context).primaryColor,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'Add GPS',
+                                    style: TextStyle(
+                                      color: Theme.of(context).primaryColor,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                      )
-                    else
-                      InkWell(
-                        onTap: () => _showAssignDeviceDialog(context, dog.id),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.add,
-                                size: 14,
-                                color: Theme.of(context).primaryColor,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Add GPS',
-                                style: TextStyle(
-                                  color: Theme.of(context).primaryColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
+                        
+                        // Medical Info Button
+                        InkWell(
+                          onTap: () => _showMedicalInfo(context),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.medical_services,
+                                  size: 12,
+                                  color: Colors.orange[700],
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 3),
+                                Text(
+                                  'Medical',
+                                  style: TextStyle(
+                                    color: Colors.orange[700],
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
+                      ],
+                    ),
                   ],
                 ),
               ),

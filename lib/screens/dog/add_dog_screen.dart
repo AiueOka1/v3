@@ -5,7 +5,7 @@ import 'package:pawtech/providers/dog_provider.dart';
 import 'package:pawtech/providers/auth_provider.dart';
 import 'package:pawtech/widgets/custom_button.dart';
 import 'package:pawtech/widgets/custom_text_field.dart';
-import 'package:pawtech/services/image_storage_service.dart';
+import 'package:pawtech/services/cloud_image_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
@@ -109,12 +109,11 @@ class _AddDogScreenState extends State<AddDogScreen> {
         // Generate dog ID first
         final dogId = 'dog_${DateTime.now().millisecondsSinceEpoch}';
         
-        // Save image to permanent storage if one was selected
+        // Save image to Firebase Storage if one was selected
         String imageUrl;
         if (_imageFile != null) {
-          // Save image to permanent storage and get the permanent path
-          final permanentImagePath = await ImageStorageService.saveImageToPermanentStorage(_imageFile!, dogId);
-          imageUrl = permanentImagePath;
+          // Upload image to cloud storage and get the data URL
+          imageUrl = await CloudImageService.uploadDogImageToFirestore(_imageFile!, dogId);
         } else {
           // Use placeholder image if no image was selected
           imageUrl = 'https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60';

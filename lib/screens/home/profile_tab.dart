@@ -23,52 +23,68 @@ class ProfileTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final user = authProvider.currentUser;
-    
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
           const SizedBox(height: 16),
-          SmartCircleAvatar(
-            radius: 50,
-            imagePath: user?.profileImageUrl ?? 'https://ui-avatars.com/api/?name=User',
+          Consumer<AuthProvider>(
+            builder: (context, authProvider, _) {
+              final user = authProvider.currentUser;
+              return SmartCircleAvatar(
+                radius: 50,
+                imagePath: user?.profileImageUrl ?? '',
+                fallbackWidget: Icon(
+                  Icons.person,
+                  size: 40,
+                  color: Colors.grey[400],
+                ),
+              );
+            },
           ),
           const SizedBox(height: 16),
-          Text(
-            user?.name ?? 'User',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).primaryColor,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            user?.email ?? 'user@example.com',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).textTheme.bodySmall?.color,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              user?.role ?? 'Handler',
-              style: TextStyle(
-                color: Theme.of(context).primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            user?.department ?? 'Department',
-            style: Theme.of(context).textTheme.bodyMedium,
+          Consumer<AuthProvider>(
+            builder: (context, authProvider, _) {
+              final user = authProvider.currentUser;
+              return Column(
+                children: [
+                  Text(
+                    user?.name ?? 'User',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    user?.email ?? 'user@example.com',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      user?.role ?? 'Handler',
+                      style: TextStyle(
+                        color: Theme.of(context).primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    user?.department ?? 'Department',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 32),
           Card(
@@ -87,19 +103,29 @@ class ProfileTab extends StatelessWidget {
                   },
                 ),
                 const Divider(height: 1),
-                ProfileMenuItem(
-                  icon: Icons.badge,
-                  title: 'Badge: ${user?.badgeNumber ?? 'N/A'}',
-                  onTap: () {
-                    // Show badge details
+                Consumer<AuthProvider>(
+                  builder: (context, authProvider, _) {
+                    final user = authProvider.currentUser;
+                    return ProfileMenuItem(
+                      icon: Icons.badge,
+                      title: 'Badge: ${user?.badgeNumber ?? 'N/A'}',
+                      onTap: () {
+                        // Show badge details
+                      },
+                    );
                   },
                 ),
                 const Divider(height: 1),
-                ProfileMenuItem(
-                  icon: Icons.phone,
-                  title: 'Phone: ${user?.phoneNumber ?? 'N/A'}',
-                  onTap: () {
-                    // Edit phone number
+                Consumer<AuthProvider>(
+                  builder: (context, authProvider, _) {
+                    final user = authProvider.currentUser;
+                    return ProfileMenuItem(
+                      icon: Icons.phone,
+                      title: 'Phone: ${user?.phoneNumber ?? 'N/A'}',
+                      onTap: () {
+                        // Edit phone number
+                      },
+                    );
                   },
                 ),
               ],

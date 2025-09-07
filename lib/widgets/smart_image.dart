@@ -1,5 +1,8 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:pawtech/services/cloud_image_service.dart';
 
 class SmartImage extends StatelessWidget {
   final String? imagePath;
@@ -23,6 +26,53 @@ class SmartImage extends StatelessWidget {
   Widget build(BuildContext context) {
     if (imagePath == null || imagePath!.isEmpty) {
       return _buildFallback();
+    }
+
+    // Handle Firestore chunked image references
+    if (imagePath!.startsWith('firestore://dog_images_chunked/')) {
+      final dogId = imagePath!.substring('firestore://dog_images_chunked/'.length);
+      return FutureBuilder<String>(
+        future: CloudImageService.getChunkedImageData(dogId),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return errorWidget ?? _buildFallback();
+          }
+          if (snapshot.hasData) {
+            final bytes = CloudImageService.base64ToBytes(snapshot.data!);
+            if (bytes != null) {
+              return Image.memory(
+                bytes,
+                width: width,
+                height: height,
+                fit: fit,
+                errorBuilder: (context, error, stackTrace) {
+                  return errorWidget ?? _buildFallback();
+                },
+              );
+            }
+          }
+          return placeholder ?? _buildLoadingPlaceholder();
+        },
+      );
+    }
+
+    // Handle base64 data URLs
+    if (imagePath!.startsWith('data:image/')) {
+      final base64String = CloudImageService.getBase64FromDataUrl(imagePath!);
+      if (base64String != null) {
+        final bytes = CloudImageService.base64ToBytes(base64String);
+        if (bytes != null) {
+          return Image.memory(
+            bytes,
+            width: width,
+            height: height,
+            fit: fit,
+            errorBuilder: (context, error, stackTrace) {
+              return errorWidget ?? _buildFallback();
+            },
+          );
+        }
+      }
     }
 
     if (imagePath!.startsWith('http://') || imagePath!.startsWith('https://')) {
@@ -75,7 +125,21 @@ class SmartImage extends StatelessWidget {
     );
   }
 
-  Widget _buildLoadingIndicator(ImageChunkEvent loadingProgress) {
+  Widget _buildLoadingPlaceholder() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
+
+  Widget _buildLoadingIndicator(ImageChunkEvent? loadingProgress) {
     return Container(
       width: width,
       height: height,
@@ -85,8 +149,8 @@ class SmartImage extends StatelessWidget {
       ),
       child: Center(
         child: CircularProgressIndicator(
-          value: loadingProgress.expectedTotalBytes != null
-              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+          value: loadingProgress?.expectedTotalBytes != null
+              ? loadingProgress!.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
               : null,
         ),
       ),
@@ -116,7 +180,81 @@ class SmartCircleAvatar extends StatelessWidget {
       );
     }
 
-    if (imagePath!.startsWith('http://') || imagePath!.startsWith('https://')) {
+    // Handle Firestore chunked image references
+    if (imagePath!.startsWith('firestore://dog_images_chunked/')) {
+      final dogId = imagePath!.substring('firestore://dog_images_chunked/'.length);
+      return FutureBuilder<String>(
+        future: CloudImageService.getChunkedImageData(dogId),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return CircleAvatar(
+              radius: radius,
+              backgroundColor: Colors.grey[300],
+              child: fallbackWidget ?? Icon(Icons.pets, size: radius, color: Colors.grey),
+            );
+          }
+          if (snapshot.hasData) {
+            final bytes = CloudImageService.base64ToBytes(snapshot.data!);
+            if (bytes != null) {
+              return CircleAvatar(
+                radius: radius,
+                backgroundImage: MemoryImage(bytes),
+              );
+            }
+          }
+          return CircleAvatar(
+            radius: radius,
+            backgroundColor: Colors.grey[200],
+            child: const CircularProgressIndicator(),
+          );
+        },
+      );
+    }
+
+    if (imagePath!.startsWith('data:image/')) {
+      // Base64 data URL
+      try {
+        final bytes = CloudImageService.base64ToBytes(imagePath!);
+        if (bytes != null) {
+          return CircleAvatar(
+            radius: radius,
+            backgroundImage: MemoryImage(bytes),
+            onBackgroundImageError: (exception, stackTrace) {
+              // This will show the fallback
+            },
+            child: Container(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+              ),
+              child: ClipOval(
+                child: Image.memory(
+                  bytes,
+                  width: radius * 2,
+                  height: radius * 2,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: radius * 2,
+                      height: radius * 2,
+                      color: Colors.grey[300],
+                      child: fallbackWidget ?? Icon(Icons.pets, size: radius, color: Colors.grey),
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        // Fall through to show placeholder
+      }
+      
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: Colors.grey[300],
+        child: fallbackWidget ?? Icon(Icons.pets, size: radius, color: Colors.grey),
+      );
+    } else if (imagePath!.startsWith('http://') || imagePath!.startsWith('https://')) {
       // Network image
       return CircleAvatar(
         radius: radius,

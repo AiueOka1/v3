@@ -317,4 +317,27 @@ class DogProvider with ChangeNotifier {
       rethrow;
     }
   }
+
+  /// Update dog medical information
+  Future<void> updateDogMedicalInfo(String dogId, String medicalInfo) async {
+    try {
+      // Update the medical info in Firestore first
+      await FirebaseFirestore.instance
+          .collection('dogs')
+          .doc(dogId)
+          .update({'medicalInfo': medicalInfo});
+
+      // Then update the local state
+      final dogIndex = _dogs.indexWhere((dog) => dog.id == dogId);
+      if (dogIndex != -1) {
+        final updatedDog = _dogs[dogIndex].copyWith(medicalInfo: medicalInfo);
+        _dogs[dogIndex] = updatedDog;
+        notifyListeners();
+      }
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
 }
