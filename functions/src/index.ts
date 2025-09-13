@@ -94,6 +94,24 @@ export const onDogLocationUpdate = functions.firestore
       }
     });
 
+    // Store alert in Firestore for persistence with handlerId
+    const alertId = `geofence_${dogId}_${Date.now()}`;
+    await db.collection('alerts').doc(alertId).set({
+      id: alertId,
+      dogId: dogId,
+      dogName: dogName,
+      type: 'geofence_breach',
+      message: `${dogName} has left the ${geofenceName} safe zone!`,
+      location: {
+        latitude: afterLoc.latitude,
+        longitude: afterLoc.longitude,
+        timestamp: now.toDate().toISOString(),
+      },
+      timestamp: now.toDate().toISOString(),
+      isRead: false,
+      handlerId: handlerId, // Associate alert with the handler
+    });
+
     // Update cooldown timestamp
     await gfSnap.ref.update({ lastAlertAt: now });
   });

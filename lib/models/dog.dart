@@ -59,20 +59,20 @@ class Dog {
     final data = doc.data() as Map<String, dynamic>;
     return Dog(
       id: doc.id,
-      name: data['name'],
-      breed: data['breed'],
-      imageUrl: data['imageUrl'],
-      handlerId: data['handlerId'],
-      handlerName: data['handlerName'],
-      specialization: data['specialization'],
-      trainingLevel: data['trainingLevel'],
-      lastKnownLocation: Map<String, dynamic>.from(data['lastKnownLocation']),
-      isActive: data['isActive'],
-      nfcTagId: data['nfcTagId'],
-      department: data['department'],
-      medicalInfo: data['medicalInfo'],
-      emergencyContact: data['emergencyContact'],
-      deviceId: data['deviceId'], // Make sure this is included
+      name: data['name'] ?? '',
+      breed: data['breed'] ?? '',
+      imageUrl: data['imageUrl'] ?? '',
+      handlerId: data['handlerId'] ?? '',
+      handlerName: data['handlerName'] ?? '',
+      specialization: data['specialization'] ?? '',
+      trainingLevel: data['trainingLevel'] ?? '',
+      lastKnownLocation: Map<String, dynamic>.from(data['lastKnownLocation'] ?? {}),
+      isActive: data['isActive'] ?? false,
+      nfcTagId: data['nfcTagId'] ?? '',
+      department: data['department'] ?? '',
+      medicalInfo: data['medicalInfo'] ?? '',
+      emergencyContact: data['emergencyContact'] ?? '',
+      deviceId: data['deviceId'], // This can be null, which is fine
     );
   }
 

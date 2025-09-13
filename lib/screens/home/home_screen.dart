@@ -55,9 +55,10 @@ class _HomeScreenState extends State<HomeScreen> {
     await authProvider.logout();
 
     if (mounted) {
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false, // Remove all previous routes
+      );
     }
   }
 

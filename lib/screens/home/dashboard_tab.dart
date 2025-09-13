@@ -158,12 +158,48 @@ class DashboardTab extends StatelessWidget {
                         color: Theme.of(context).primaryColor,
                       ),
                     ),
-                    TextButton(
-                      onPressed: () {
-                        // Navigate to alerts tab
-                        HomeScreen.homeScreenKey.currentState?.changeTab(3);
-                      },
-                      child: const Text('View All'),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Button to create test alert for testing new collection
+                        /*
+                        IconButton(
+                          onPressed: () {
+                            if (dogs.isNotEmpty) {
+                              alertProvider.createGeofenceBreachAlert(
+                                dogs.first.id,
+                                dogs.first.name,
+                                {
+                                  'latitude': 14.6550,
+                                  'longitude': 120.9850,
+                                },
+                              );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Test alert created for ${dogs.first.name}'),
+                                  duration: const Duration(seconds: 3),
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('No dogs available - add a dog first'),
+                                  duration: Duration(seconds: 3),
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.add_alert),
+                          tooltip: 'Create Test Alert',
+                        ), */
+                        TextButton(
+                          onPressed: () {
+                            // Navigate to alerts tab
+                            HomeScreen.homeScreenKey.currentState?.changeTab(3);
+                          },
+                          child: const Text('View All'),
+                        ),
+                      ],
                     ),
                   ],
                 ),

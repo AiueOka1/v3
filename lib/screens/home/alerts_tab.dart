@@ -53,14 +53,19 @@ class _AlertsTabState extends State<AlertsTab> with SingleTickerProviderStateMix
                       overflow: TextOverflow.ellipsis, // Add this to handle very long text
                     ),
                   ),
-                  if (unreadAlerts.isNotEmpty)
-                    TextButton.icon(
-                      onPressed: () {
-                        alertProvider.markAllAlertsAsRead();
-                      },
-                      icon: const Icon(Icons.done_all),
-                      label: const Text('Mark All Read'),
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (unreadAlerts.isNotEmpty)
+                        TextButton.icon(
+                          onPressed: () {
+                            alertProvider.markAllAlertsAsRead();
+                          },
+                          icon: const Icon(Icons.done_all),
+                          label: const Text('Mark All Read'),
+                        ),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 16),

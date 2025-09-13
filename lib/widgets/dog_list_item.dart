@@ -47,6 +47,34 @@ class DogListItem extends StatelessWidget {
     }
   }
 
+  Future<void> _removeDevice(BuildContext context, String dogId) async {
+    final dogProvider = Provider.of<DogProvider>(context, listen: false);
+
+    final errorMessage = await dogProvider.removeDeviceFromDog(dogId);
+
+    if (errorMessage != null) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Error'),
+          content: Text(errorMessage),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('GPS device removed successfully!')),
+      );
+    }
+  }
+
   Future<void> _showAssignDeviceDialog(
     BuildContext context,
     String dogId,
@@ -90,6 +118,40 @@ class DogListItem extends StatelessWidget {
                 _assignDevice(context, dogId, deviceId);
               },
               child: const Text('Assign'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showRemoveDeviceDialog(
+    BuildContext context,
+    String dogId,
+  ) async {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Remove GPS Device'),
+          content: const Text(
+            'Are you sure you want to remove the GPS device from this dog? '
+            'This will stop location tracking for this dog.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _removeDevice(context, dogId);
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Remove'),
             ),
           ],
         );
@@ -186,26 +248,32 @@ class DogListItem extends StatelessWidget {
                       children: [
                         // GPS Status/Button
                         if (dog.deviceId != null && dog.deviceId!.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.gps_fixed, size: 12, color: Colors.green[700]),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'GPS',
-                                  style: TextStyle(
-                                    color: Colors.green[700],
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
+                          InkWell(
+                            onTap: () => _showRemoveDeviceDialog(context, dog.id),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.gps_fixed, size: 12, color: Colors.green[700]),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'GPS',
+                                    style: TextStyle(
+                                      color: Colors.green[700],
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 3),
+                                  Icon(Icons.close, size: 10, color: Colors.green[700]),
+                                ],
+                              ),
                             ),
                           )
                         else

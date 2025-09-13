@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pawtech/models/alert.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AlertProvider with ChangeNotifier {
   List<Alert> _alerts = [];
@@ -18,12 +19,41 @@ class AlertProvider with ChangeNotifier {
       FirebaseFirestore.instance.collection('alerts');
 
   Future<void> fetchAlerts() async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    // Defer state changes to avoid build phase conflicts
+    Future.microtask(() {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+    });
+    
     try {
-      final snap = await _col.orderBy('timestamp', descending: true).get();
-      _alerts = snap.docs.map((doc) {
+      // Get current user
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        Future.microtask(() {
+          _alerts = [];
+          _isLoading = false;
+          notifyListeners();
+        });
+        return;
+      }
+
+      QuerySnapshot<Map<String, dynamic>> alertsSnapshot;
+      
+      try {
+        // Try with orderBy first (requires Firestore index)
+        alertsSnapshot = await _col
+            .where('handlerId', isEqualTo: currentUser.uid)
+            .orderBy('timestamp', descending: true)
+            .get();
+      } catch (e) {
+        // Fallback: query without orderBy (no index required)
+        alertsSnapshot = await _col
+            .where('handlerId', isEqualTo: currentUser.uid)
+            .get();
+      }
+      
+      final alertsList = alertsSnapshot.docs.map((doc) {
         final d = doc.data();
         return Alert(
           id: d['id'] as String,
@@ -34,25 +64,63 @@ class AlertProvider with ChangeNotifier {
           location: Map<String, dynamic>.from(d['location'] ?? {}),
           timestamp: d['timestamp'] as String,
           isRead: (d['isRead'] as bool?) ?? false,
+          handlerId: d['handlerId'] as String?,
         );
       }).toList();
+      
+      // Sort by timestamp if we used the fallback query
+      alertsList.sort((a, b) => DateTime.parse(b.timestamp).compareTo(DateTime.parse(a.timestamp)));
+      
+      Future.microtask(() {
+        _alerts = alertsList;
+        _isLoading = false;
+        notifyListeners();
+      });
     } catch (e) {
-      _error = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+      Future.microtask(() {
+        _error = e.toString();
+        _isLoading = false;
+        notifyListeners();
+      });
     }
   }
 
   Future<void> addAlert(Alert alert) async {
     try {
+      print('🔄 Adding alert: ${alert.id} for dog: ${alert.dogId}');
+      
+      // Get current user ID to associate the alert with the handler
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      print('👤 Current user ID: $currentUserId');
+      
+      if (currentUserId == null) {
+        print('❌ No authenticated user found');
+        Future.microtask(() {
+          _error = 'User not authenticated';
+          notifyListeners();
+        });
+        return;
+      }
+      
+      final alertData = alert.toJson();
+      
+      print('📝 Alert data to store: $alertData');
+      
       // Use the client-generated id so UI can reference it immediately
-      await _col.doc(alert.id).set(alert.toJson());
-      _alerts.insert(0, alert);
-      notifyListeners();
+      await _col.doc(alert.id).set(alertData);
+      print('✅ Alert stored in Firestore successfully');
+      
+      Future.microtask(() {
+        _alerts.insert(0, alert);
+        notifyListeners();
+      });
+      print('✅ Alert added to local state and UI notified');
     } catch (e) {
-      _error = e.toString();
-      notifyListeners();
+      print('❌ Failed to add alert: $e');
+      Future.microtask(() {
+        _error = e.toString();
+        notifyListeners();
+      });
     }
   }
 
@@ -70,12 +138,15 @@ class AlertProvider with ChangeNotifier {
           location: _alerts[i].location,
           timestamp: _alerts[i].timestamp,
           isRead: true,
+          handlerId: _alerts[i].handlerId,
         );
-        notifyListeners();
+        Future.microtask(() => notifyListeners());
       }
     } catch (e) {
-      _error = e.toString();
-      notifyListeners();
+      Future.microtask(() {
+        _error = e.toString();
+        notifyListeners();
+      });
     }
   }
 
@@ -98,12 +169,15 @@ class AlertProvider with ChangeNotifier {
                 location: a.location,
                 timestamp: a.timestamp,
                 isRead: true,
+                handlerId: a.handlerId,
               ))
           .toList();
-      notifyListeners();
+      Future.microtask(() => notifyListeners());
     } catch (e) {
-      _error = e.toString();
-      notifyListeners();
+      Future.microtask(() {
+        _error = e.toString();
+        notifyListeners();
+      });
     }
   }
 
@@ -111,10 +185,12 @@ class AlertProvider with ChangeNotifier {
     try {
       await _col.doc(alertId).delete();
       _alerts.removeWhere((a) => a.id == alertId);
-      notifyListeners();
+      Future.microtask(() => notifyListeners());
     } catch (e) {
-      _error = e.toString();
-      notifyListeners();
+      Future.microtask(() {
+        _error = e.toString();
+        notifyListeners();
+      });
     }
   }
 
@@ -126,35 +202,110 @@ class AlertProvider with ChangeNotifier {
     String dogId,
     String dogName,
     Map<String, dynamic> location,
-  ) {
-    final newAlert = Alert(
-      id: 'alert_${DateTime.now().millisecondsSinceEpoch}',
-      dogId: dogId,
-      dogName: dogName,
-      type: 'geofence_warning',
-      message: '$dogName is approaching the boundary of the safe zone!',
-      location: location,
-      timestamp: DateTime.now().toIso8601String(),
-      isRead: false,
-    );
-    addAlert(newAlert);
+  ) async {
+    try {
+      // Get the current user ID as the handler
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      if (currentUserId == null) return;
+      
+      final newAlert = Alert(
+        id: 'alert_${DateTime.now().millisecondsSinceEpoch}',
+        dogId: dogId,
+        dogName: dogName,
+        type: 'geofence_warning',
+        message: '$dogName is approaching the boundary of the safe zone!',
+        location: location,
+        timestamp: DateTime.now().toIso8601String(),
+        isRead: false,
+        handlerId: currentUserId,
+      );
+      addAlert(newAlert);
+    } catch (e) {
+      print('❌ Failed to create geofence warning alert: $e');
+    }
   }
 
   void createGeofenceBreachAlert(
     String dogId,
     String dogName,
     Map<String, dynamic> location,
-  ) {
-    final newAlert = Alert(
-      id: 'alert_${DateTime.now().millisecondsSinceEpoch}',
-      dogId: dogId,
-      dogName: dogName,
-      type: 'geofence_breach',
-      message: '$dogName has left the designated safe zone!',
-      location: location,
-      timestamp: DateTime.now().toIso8601String(),
-      isRead: false,
-    );
-    addAlert(newAlert);
+  ) async {
+    try {
+      // Get the current user ID as the handler
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      if (currentUserId == null) return;
+      
+      final newAlert = Alert(
+        id: 'alert_${DateTime.now().millisecondsSinceEpoch}',
+        dogId: dogId,
+        dogName: dogName,
+        type: 'geofence_breach',
+        message: '$dogName has left the designated safe zone!',
+        location: location,
+        timestamp: DateTime.now().toIso8601String(),
+        isRead: false,
+        handlerId: currentUserId,
+      );
+      addAlert(newAlert);
+    } catch (e) {
+      print('❌ Failed to create geofence breach alert: $e');
+    }
+  }
+
+  /// Clear all local alerts and refresh from Firestore
+  Future<void> refreshAlertsFromFirestore() async {
+    _alerts.clear();
+    await fetchAlerts();
+  }
+
+  /// Clear all local alerts (for logout or user switching)
+  void clearAlerts() {
+    print('🧹 Clearing all alerts');
+    
+    // Use Future.microtask to ensure all state changes happen outside build phase
+    Future.microtask(() {
+      _alerts.clear();
+      _isLoading = false;
+      _error = null;
+      notifyListeners();
+    });
+  }
+
+  /// Initialize the alert system for a fresh start
+  Future<void> initializeAlerts() async {
+    print('🚀🚀🚀 UPDATED CODE RUNNING - AlertProvider.initializeAlerts() called');
+    
+    // Defer initial state changes to avoid build phase conflicts
+    Future.microtask(() {
+      print('📱 Setting initial state in microtask');
+      _isLoading = true;
+      _error = null;
+      _alerts.clear();
+      notifyListeners();
+    });
+    
+    try {
+      print('🚀 Initializing fresh alerts system...');
+      final currentUser = FirebaseAuth.instance.currentUser;
+      
+      if (currentUser != null) {
+        print('👤 User authenticated: ${currentUser.uid}');
+        await fetchAlerts();
+        print('✅ Alerts system initialized successfully');
+      } else {
+        print('⚠️ No authenticated user - alerts will be empty');
+        Future.microtask(() {
+          _isLoading = false;
+          notifyListeners();
+        });
+      }
+    } catch (e) {
+      print('❌ Failed to initialize alerts: $e');
+      Future.microtask(() {
+        _error = e.toString();
+        _isLoading = false;
+        notifyListeners();
+      });
+    }
   }
 }

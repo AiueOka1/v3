@@ -15,10 +15,37 @@ class ProfileTab extends StatelessWidget {
     await authProvider.logout();
 
     if (context.mounted) {
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false, // Remove all previous routes
       );
     }
+  }
+
+  Widget _buildPolicySection(String title, String content) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            content,
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -189,11 +216,123 @@ class ProfileTab extends StatelessWidget {
                   title: 'Privacy Policy',
                   onTap: () {
                     // Show privacy policy
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Privacy Policy'),
+                        content: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'PawTech Privacy Policy',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Last Updated: September 12, 2025\n',
+                                style: TextStyle(fontStyle: FontStyle.italic),
+                              ),
+                              _buildPolicySection(
+                                'Information We Collect',
+                                '• Personal Information: Name, email, phone number, badge number, department\n'
+                                '• Device Data: GPS location, device status, battery levels\n'
+                                '• Usage Data: App interactions, feature usage, performance metrics\n'
+                                '• Canine Data: Dog profiles, training records, medical information',
+                              ),
+                              _buildPolicySection(
+                                'How We Use Your Information',
+                                '• Provide location tracking and safety monitoring services\n'
+                                '• Send geofencing alerts and notifications\n'
+                                '• Maintain and improve app functionality\n'
+                                '• Ensure security and prevent unauthorized access\n'
+                                '• Generate analytics and reports for operational efficiency',
+                              ),
+                              _buildPolicySection(
+                                'Information Sharing',
+                                '• We do not sell or rent your personal information\n'
+                                '• Data may be shared with authorized personnel within your department\n'
+                                '• Emergency information may be shared with first responders when necessary\n'
+                                '• We may share anonymized data for research and development',
+                              ),
+                              _buildPolicySection(
+                                'Data Security',
+                                '• All data is encrypted in transit and at rest\n'
+                                '• Access is restricted to authorized personnel only\n'
+                                '• Regular security audits and monitoring\n'
+                                '• Secure cloud infrastructure with Firebase/Google Cloud',
+                              ),
+                              _buildPolicySection(
+                                'Data Retention',
+                                '• Personal data is retained while you have an active account\n'
+                                '• Location data is retained for 90 days for operational purposes\n'
+                                '• You may request data deletion by contacting support\n'
+                                '• Some data may be retained longer for legal compliance',
+                              ),
+                              _buildPolicySection(
+                                'Your Rights',
+                                '• Access and review your personal information\n'
+                                '• Request corrections to inaccurate data\n'
+                                '• Request deletion of your account and data\n'
+                                '• Opt-out of non-essential communications\n'
+                                '• Contact us with privacy concerns or questions',
+                              ),
+                              _buildPolicySection(
+                                'Contact Information',
+                                'For privacy-related questions or concerns:\n'
+                                'Email: pawtechsender@gmail.com\n'
+                                'Phone: [09297523789]',
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'This privacy policy may be updated periodically. Users will be notified of significant changes.',
+                                style: TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    );
                   },
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          // Development/Debug Section
+          /*
+          Card(
+            margin: EdgeInsets.zero,
+            color: Colors.grey[50],
+            child: Column(
+              children: [
+                ProfileMenuItem(
+                  icon: Icons.developer_mode,
+                  title: 'Device Assignment Debug',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const DeviceAssignmentDebugScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ), */
           const SizedBox(height: 32),
           ElevatedButton.icon(
             onPressed: () {

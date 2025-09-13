@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 // ignore: unused_import
 import 'package:pawtech/models/dog.dart';
-import 'package:pawtech/models/geofence.dart';
 import 'package:pawtech/providers/dog_provider.dart';
 import 'package:pawtech/providers/geofence_provider.dart';
 import 'package:pawtech/providers/alert_provider.dart';
@@ -196,6 +195,22 @@ class _DogDetailsScreenState extends State<DogDetailsScreen>
                         _buildInfoItem('Training Level', dog.trainingLevel),
                         _buildInfoItem('NFC Tag ID', dog.nfcTagId),
                         _buildInfoItem('Medical Info', dog.medicalInfo),
+                        if (dog.deviceId != null && dog.deviceId!.isNotEmpty)
+                          _buildInfoItemWithAction(
+                            'GPS Device',
+                            dog.deviceId!,
+                            Icons.delete,
+                            Colors.red,
+                            () => _showRemoveDeviceDialog(context, dog),
+                          )
+                        else
+                          _buildInfoItemWithAction(
+                            'GPS Device',
+                            'Not assigned',
+                            Icons.add,
+                            Theme.of(context).primaryColor,
+                            () => _showAssignDeviceDialog(context, dog),
+                          ),
                       ]),
                       const SizedBox(height: 16),
                       _buildInfoSection(context, 'Status', [
@@ -294,6 +309,177 @@ class _DogDetailsScreenState extends State<DogDetailsScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildInfoItemWithAction(
+    String label, 
+    String value, 
+    IconData icon, 
+    Color iconColor, 
+    VoidCallback onTap,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(label, style: const TextStyle(color: Colors.grey)),
+          ),
+          Expanded(
+            flex: 3,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    value,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      icon,
+                      size: 16,
+                      color: iconColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAssignDeviceDialog(BuildContext context, Dog dog) async {
+    final TextEditingController deviceIdController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text('Assign GPS Device to ${dog.name}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: deviceIdController,
+                decoration: const InputDecoration(
+                  labelText: 'Enter Device ID',
+                  hintText: 'e.g., DEVICE###',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final deviceId = deviceIdController.text.trim();
+
+                if (deviceId.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Device ID cannot be empty')),
+                  );
+                  return;
+                }
+
+                Navigator.of(ctx).pop();
+                
+                final dogProvider = Provider.of<DogProvider>(context, listen: false);
+                final errorMessage = await dogProvider.assignDeviceToDog(dog.id, deviceId);
+
+                if (mounted) {
+                  if (errorMessage != null) {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Error'),
+                        content: Text(errorMessage),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Device assigned successfully!')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Assign'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showRemoveDeviceDialog(BuildContext context, Dog dog) async {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text('Remove GPS Device from ${dog.name}'),
+          content: Text(
+            'Are you sure you want to remove the GPS device (${dog.deviceId}) from ${dog.name}? '
+            'This will stop location tracking for this dog.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(ctx).pop();
+                
+                final dogProvider = Provider.of<DogProvider>(context, listen: false);
+                final errorMessage = await dogProvider.removeDeviceFromDog(dog.id);
+
+                if (mounted) {
+                  if (errorMessage != null) {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Error'),
+                        content: Text(errorMessage),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('GPS device removed successfully!')),
+                    );
+                  }
+                }
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Remove'),
+            ),
+          ],
+        );
+      },
     );
   }
 

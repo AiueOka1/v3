@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pawtech/providers/auth_provider.dart';
 import 'package:pawtech/screens/auth/register_screen.dart';
-import 'package:pawtech/screens/home/home_screen.dart';
+import 'package:pawtech/screens/auth/two_factor_verification_screen.dart';
 import 'package:pawtech/widgets/custom_button.dart';
 import 'package:pawtech/widgets/custom_text_field.dart';
 
@@ -49,8 +49,14 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (success && mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => HomeScreen()),
+        // Navigate to 2FA verification screen
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => TwoFactorVerificationScreen(
+              email: _emailController.text.trim(),
+              password: _passwordController.text,
+            ),
+          ),
         );
       }
     }
@@ -163,14 +169,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   const SizedBox(height: 16),
-                  TextButton(
+                  /*TextButton(
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const RegisterScreen()),
                       );
                     },
                     child: const Text('Don\'t have an account? Register'),
-                  ),
+                  ), this is for registration hidden button */ 
                   const SizedBox(height: 24),
                   Text(
                     'Demo credentials: kian@example.com / password',

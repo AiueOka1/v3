@@ -7,6 +7,7 @@ class Alert {
   final Map<String, dynamic> location;
   final String timestamp;
   final bool isRead;
+  final String? handlerId; // Add handlerId field
 
   Alert({
     required this.id,
@@ -17,6 +18,7 @@ class Alert {
     required this.location,
     required this.timestamp,
     required this.isRead,
+    this.handlerId, // Add handlerId parameter
   });
 
   factory Alert.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class Alert {
       location: json['location'],
       timestamp: json['timestamp'],
       isRead: json['isRead'],
+      handlerId: json['handlerId'], // Add handlerId from JSON
     );
   }
 
@@ -42,6 +45,7 @@ class Alert {
       'location': location,
       'timestamp': timestamp,
       'isRead': isRead,
+      'handlerId': handlerId, // Add handlerId to JSON
     };
   }
 }

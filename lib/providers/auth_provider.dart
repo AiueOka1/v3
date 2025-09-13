@@ -91,7 +91,10 @@ class AuthProvider with ChangeNotifier {
     if (firebaseUser != null) {
       await _loadUserData(firebaseUser.uid);
     }
-    notifyListeners();
+    // Use WidgetsBinding to defer the notification until after the build phase
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
   }
 
   Future<void> _saveTokenOnRefresh() async {
@@ -188,6 +191,36 @@ class AuthProvider with ChangeNotifier {
   Future<bool> login(String email, String password) async {
     if (!_isInitialized) await _init();
 
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      // Only validate credentials without completing login
+      // The actual Firebase login will happen in completeLogin after 2FA
+      final credential = fb_auth.EmailAuthProvider.credential(
+        email: email,
+        password: password,
+      );
+      
+      // Test the credentials without signing in
+      await _auth.signInWithCredential(credential);
+      await _auth.signOut(); // Sign out immediately after validation
+      
+      return true;
+    } on fb_auth.FirebaseAuthException catch (e) {
+      _error = e.message;
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> completeLogin(String email, String password) async {
     _isLoading = true;
     _error = null;
     notifyListeners();

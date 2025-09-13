@@ -171,6 +171,9 @@ class FcmService {
         'timestamp': DateTime.now().toIso8601String(),
       };
 
+      // Get current user ID to associate the alert with the handler
+      final currentUserId = fb_auth.FirebaseAuth.instance.currentUser?.uid;
+
       await FirebaseFirestore.instance.collection('alerts').doc(id).set({
         'id': id,
         'dogId': dogId,
@@ -180,6 +183,7 @@ class FcmService {
         'location': location,
         'timestamp': DateTime.now().toIso8601String(),
         'isRead': false,
+        if (currentUserId != null) 'handlerId': currentUserId, // Add handlerId for better filtering
       });
     } catch (e) {
       debugPrint('Failed to store incoming alert: $e');

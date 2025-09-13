@@ -43,14 +43,13 @@ class _SplashScreenState extends State<SplashScreen>
     setState(() => _authChecked = true);
 
     if (mounted) {
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder:
-              (_) =>
-                  authProvider.isAuthenticated
-                      ? HomeScreen()
-                      : const LoginScreen(),
+          builder: (_) => authProvider.isAuthenticated
+              ? HomeScreen()
+              : const LoginScreen(),
         ),
+        (route) => false, // Remove all previous routes
       );
     }
   }

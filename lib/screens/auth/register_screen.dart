@@ -1,3 +1,4 @@
+//register_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pawtech/providers/auth_provider.dart';
@@ -61,8 +62,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
 
       if (success && mounted) {
-        Navigator.of(context).pushReplacement(
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => HomeScreen()),
+          (route) => false, // Remove all previous routes
         );
       }
     }

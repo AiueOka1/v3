@@ -50,11 +50,22 @@ dependencies:
   uuid: ^4.2.1
   path_provider: ^2.1.1
   path: ^1.8.3
+  
+  # 2FA Email service
+  mailer: ^6.0.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: "^0.14.4"
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/paw_icon.png"
+  android_manifest_path: ".android/app/src/main/AndroidManifest.xml"
+
 
 flutter:
   uses-material-design: true

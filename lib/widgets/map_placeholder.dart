@@ -116,6 +116,7 @@ class _RealMapViewState extends State<RealMapView> {
   String? _selectedCircleId;
   StreamSubscription<DatabaseEvent>? _databaseSubscription;
   StreamSubscription<Position>? _positionStreamSubscription;
+  StreamSubscription<User?>? _authStateSubscription;
   bool _isTracking = false;
   Timer? _geofenceCheckTimer;
   Timer? _autoRefreshTimer;
@@ -152,6 +153,7 @@ class _RealMapViewState extends State<RealMapView> {
     _filterStart = now.subtract(const Duration(hours: 6));
     _filterEnd = now;
 
+    _setupAuthListener();
     _checkLocationPermission();
     _listenToDatabaseChanges();
     _startGeofenceMonitoring();
@@ -162,9 +164,44 @@ class _RealMapViewState extends State<RealMapView> {
   void dispose() {
     _databaseSubscription?.cancel();
     _positionStreamSubscription?.cancel();
+    _authStateSubscription?.cancel();
     _geofenceCheckTimer?.cancel();
     _autoRefreshTimer?.cancel(); // stop timer
     super.dispose();
+  }
+
+  void _setupAuthListener() {
+    _authStateSubscription = FirebaseAuth.instance.authStateChanges().listen(
+      (User? user) {
+        if (!mounted) return;
+        
+        if (user == null) {
+          // User logged out, clean up everything
+          print('User logged out, cleaning up map data and listeners');
+          _databaseSubscription?.cancel();
+          _databaseSubscription = null;
+          _autoRefreshTimer?.cancel();
+          _geofenceCheckTimer?.cancel();
+          
+          if (mounted) {
+            setState(() {
+              _markers.clear();
+              _polylines.clear();
+              _deviceCircles.clear();
+              _circleInfo.clear();
+              _lastDbValue = null;
+            });
+          }
+        } else {
+          // User logged in, restart listeners if needed
+          if (_databaseSubscription == null) {
+            _listenToDatabaseChanges();
+            _startGeofenceMonitoring();
+            _startAutoRefresh();
+          }
+        }
+      },
+    );
   }
 
   void _startGeofenceMonitoring() {
@@ -178,6 +215,13 @@ class _RealMapViewState extends State<RealMapView> {
     if (_markers.isEmpty) return;
 
     final geofenceCenter = _getGeofenceCenter();
+    
+    // For current location mode, skip checking if GPS isn't available
+    if (widget.geofenceLocation == 'current' && _currentUserPosition == null) {
+      print('⚠️ Cannot check geofence status: current location mode but GPS not available');
+      return;
+    }
+    
     final double warningThreshold = widget.geofenceRadius * 0.8;
 
     _markers.forEach((deviceId, marker) {
@@ -209,13 +253,24 @@ class _RealMapViewState extends State<RealMapView> {
   }
 
   LatLng _getGeofenceCenter() {
-    if (widget.geofenceLocation == 'city_hall') {
+    // Check the geofence location setting
+    if (widget.geofenceLocation == 'current') {
+      // When set to current location, always follow the user
+      if (_currentUserPosition != null) {
+        print('🎯 Geofence set to current location - following user: ${_currentUserPosition!.latitude}, ${_currentUserPosition!.longitude}');
+        return _currentUserPosition!;
+      } else {
+        print('⚠️ Geofence set to current location but GPS unavailable, using fallback: 14.6580779, 120.9767746');
+        return const LatLng(14.6580779, 120.9767746);
+      }
+    } else {
+      // When set to city hall or other fixed location, use that location
+      print('🏛️ Geofence set to city hall location: 14.6580779, 120.9767746');
       return const LatLng(
         14.6580779,
         120.9767746,
-      ); // STI coords
+      ); // City Hall/STI coordinates
     }
-    return _currentUserPosition ?? const LatLng(0, 0);
   }
 
   double _calculateDistance(
@@ -318,7 +373,7 @@ class _RealMapViewState extends State<RealMapView> {
   void _startLiveLocationTracking() {
     const LocationSettings locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 10,
+      distanceFilter: 1, // Reduced to 1 meter for very frequent updates when testing geofence
     );
 
     _positionStreamSubscription = Geolocator.getPositionStream(
@@ -327,13 +382,30 @@ class _RealMapViewState extends State<RealMapView> {
       (Position position) {
         if (!mounted) return;
 
+        final newPosition = LatLng(position.latitude, position.longitude);
+        final bool locationChanged = _currentUserPosition == null || 
+            (_currentUserPosition!.latitude != newPosition.latitude || 
+             _currentUserPosition!.longitude != newPosition.longitude);
+
         setState(() {
-          _currentUserPosition = LatLng(position.latitude, position.longitude);
+          _currentUserPosition = newPosition;
 
           if (_isTracking) {
             _moveCameraToCurrentPosition();
           }
+          
+          // The setState will automatically trigger a rebuild of the geofence circles
+          // since _buildGeofenceCircles() depends on _currentUserPosition
         });
+
+        // Log when user location changes to help with debugging
+        if (locationChanged) {
+          print('📍 User location updated: ${newPosition.latitude}, ${newPosition.longitude}');
+          if (widget.geofenceLocation == 'current') {
+            print('🎯 Geofence should update to follow user location');
+          }
+          print('🔄 Geofence circles will be rebuilt automatically');
+        }
       },
       onError: (e) {
         if (!mounted) return;
@@ -369,6 +441,8 @@ class _RealMapViewState extends State<RealMapView> {
           16,
         ),
       );
+      
+      print('🏛️ Moved camera to city hall: 14.6580779, 120.9767746');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -483,6 +557,7 @@ class _RealMapViewState extends State<RealMapView> {
     final initialStart = _filterStart ?? now.subtract(const Duration(days: 1));
     final initialEnd = _filterEnd ?? now;
 
+    // First, pick the date range
     final range = await showDateRangePicker(
       context: context,
       firstDate: DateTime(now.year - 5),
@@ -492,10 +567,42 @@ class _RealMapViewState extends State<RealMapView> {
 
     if (!mounted || range == null) return;
 
+    // Then pick start time
+    final startTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initialStart),
+      helpText: 'Select start time',
+    );
+
+    if (!mounted || startTime == null) return;
+
+    // Then pick end time
+    final endTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initialEnd),
+      helpText: 'Select end time',
+    );
+
+    if (!mounted || endTime == null) return;
+
     setState(() {
       _timeFilter = TimeFilterPreset.custom;
-      _filterStart = DateTime(range.start.year, range.start.month, range.start.day);
-      _filterEnd = DateTime(range.end.year, range.end.month, range.end.day, 23, 59, 59, 999);
+      // Combine date and time for start
+      _filterStart = DateTime(
+        range.start.year,
+        range.start.month,
+        range.start.day,
+        startTime.hour,
+        startTime.minute,
+      );
+      // Combine date and time for end
+      _filterEnd = DateTime(
+        range.end.year,
+        range.end.month,
+        range.end.day,
+        endTime.hour,
+        endTime.minute,
+      );
     });
     _rebuildFromCache();
   }
@@ -843,12 +950,35 @@ class _RealMapViewState extends State<RealMapView> {
   }
 
   void _listenToDatabaseChanges() {
-    _databaseSubscription = _database.onValue.listen((event) async {
-      if (!mounted) return;
-      _lastRealtimeUpdate = DateTime.now();
-      _lastDbValue = event.snapshot.value; // cache raw
-      _rebuildFromRaw(_lastDbValue);       // build using current filter
-    });
+    _databaseSubscription = _database.onValue.listen(
+      (event) async {
+        if (!mounted) return;
+        _lastRealtimeUpdate = DateTime.now();
+        _lastDbValue = event.snapshot.value; // cache raw
+        _rebuildFromRaw(_lastDbValue);       // build using current filter
+      },
+      onError: (error) {
+        // Handle database permission errors (e.g., when user logs out)
+        if (!mounted) return;
+        print('Database listener error: $error');
+        
+        // If it's a permission error, clean up and stop listening
+        if (error.toString().contains('permission')) {
+          _databaseSubscription?.cancel();
+          _databaseSubscription = null;
+          
+          // Clear existing data
+          if (mounted) {
+            setState(() {
+              _markers.clear();
+              _polylines.clear();
+              _deviceCircles.clear();
+              _circleInfo.clear();
+            });
+          }
+        }
+      },
+    );
   }
 
   // Handle tapping a history circle (select + recenter camera)
@@ -869,14 +999,41 @@ class _RealMapViewState extends State<RealMapView> {
   // Draw the geofence circle
   Set<Circle> _buildGeofenceCircles() {
     final center = _getGeofenceCenter();
+    
+    // For current location mode, only show circles if GPS is available
+    if (widget.geofenceLocation == 'current' && _currentUserPosition == null) {
+      print('⚠️ Cannot display geofence circles: current location mode but GPS not available');
+      return {};
+    }
+    
+    final mode = widget.geofenceLocation == 'current' 
+        ? 'Following user in real-time' 
+        : 'Fixed at city hall';
+    
+    print('🎯 Building geofence circles at: ${center.latitude}, ${center.longitude} with radius: ${widget.geofenceRadius}m');
+    print('🔄 Geofence mode: $mode');
+    
+    // Create unique circle IDs based on center position to force updates
+    final centerKey = '${center.latitude.toStringAsFixed(6)}_${center.longitude.toStringAsFixed(6)}';
+    
     return {
+      // Main geofence boundary circle
       Circle(
-        circleId: const CircleId('geofence_main'),
+        circleId: CircleId('geofence_main_$centerKey'),
         center: center,
         radius: widget.geofenceRadius,
-        fillColor: Colors.green.withOpacity(0.08),
+        fillColor: Colors.green.withOpacity(0.2), // Made more visible
         strokeColor: Colors.green,
-        strokeWidth: 2,
+        strokeWidth: 4, // Made thicker
+      ),
+      // Add a warning zone circle (80% of main radius)
+      Circle(
+        circleId: CircleId('geofence_warning_$centerKey'),
+        center: center,
+        radius: widget.geofenceRadius * 0.8,
+        fillColor: Colors.orange.withOpacity(0.1),
+        strokeColor: Colors.orange,
+        strokeWidth: 3,
       ),
     };
   }
@@ -1033,42 +1190,46 @@ class _RealMapViewState extends State<RealMapView> {
                 borderRadius: BorderRadius.circular(24),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 0,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       ChoiceChip(
                         label: const Text('1h'),
                         selected: _timeFilter == TimeFilterPreset.lastHour,
                         onSelected: (_) => _setTimePreset(TimeFilterPreset.lastHour),
                       ),
+                      const SizedBox(width: 6),
                       ChoiceChip(
                         label: const Text('6h'),
                         selected: _timeFilter == TimeFilterPreset.last6h,
                         onSelected: (_) => _setTimePreset(TimeFilterPreset.last6h),
                       ),
+                      const SizedBox(width: 6),
                       ChoiceChip(
                         label: const Text('24h'),
                         selected: _timeFilter == TimeFilterPreset.last24h,
                         onSelected: (_) => _setTimePreset(TimeFilterPreset.last24h),
                       ),
+                      const SizedBox(width: 6),
                       ChoiceChip(
                         label: const Text('Today'),
                         selected: _timeFilter == TimeFilterPreset.today,
                         onSelected: (_) => _setTimePreset(TimeFilterPreset.today),
                       ),
+                      const SizedBox(width: 6),
                       ChoiceChip(
                         label: const Text('All'),
                         selected: _timeFilter == TimeFilterPreset.all,
                         onSelected: (_) => _setTimePreset(TimeFilterPreset.all),
                       ),
+                      const SizedBox(width: 6),
                       OutlinedButton.icon(
                         icon: const Icon(Icons.date_range, size: 18),
                         label: Text(
                           _timeFilter == TimeFilterPreset.custom && _filterStart != null && _filterEnd != null
-                              ? '${_filterStart!.month}/${_filterStart!.day} - ${_filterEnd!.month}/${_filterEnd!.day}'
+                              ? '${_filterStart!.month}/${_filterStart!.day} ${_filterStart!.hour.toString().padLeft(2, '0')}:${_filterStart!.minute.toString().padLeft(2, '0')} - ${_filterEnd!.month}/${_filterEnd!.day} ${_filterEnd!.hour.toString().padLeft(2, '0')}:${_filterEnd!.minute.toString().padLeft(2, '0')}'
                               : 'Custom',
+                          overflow: TextOverflow.ellipsis,
                         ),
                         onPressed: _pickCustomRange,
                         style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
@@ -1108,10 +1269,10 @@ class _RealMapViewState extends State<RealMapView> {
                 ),
                 const SizedBox(height: 8),
                 FloatingActionButton(
-                  heroTag: 'centerMyLocFab',
+                  heroTag: 'centerCityHallFab',
                   onPressed: _moveCameraToCityHall,
-                  tooltip: 'Center on My Location',
-                  child: const Icon(Icons.my_location),
+                  tooltip: 'Center on City Hall',
+                  child: const Icon(Icons.location_city),
                 ),
               ],
             ),

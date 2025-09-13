@@ -30,6 +30,9 @@ class DogProvider with ChangeNotifier {
                 .get();
 
         _dogs = snapshot.docs.map((doc) => Dog.fromFirestore(doc)).toList();
+        
+        // Check realtime database for existing device assignments
+        await _checkAndUpdateDeviceAssignments();
       } catch (e) {
         _error = e.toString();
       }
@@ -37,6 +40,53 @@ class DogProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     });
+  }
+
+  /// Check realtime database for existing device assignments and update dog objects
+  Future<void> _checkAndUpdateDeviceAssignments() async {
+    try {
+      // Get all devices from realtime database
+      final dataSnapshot = await _database.child('data').get();
+      
+      if (!dataSnapshot.exists) return;
+      
+      final devicesData = dataSnapshot.value as Map<dynamic, dynamic>;
+      
+      // Create a map of dogId -> deviceId from the realtime database
+      final Map<String, String> dogToDeviceMap = {};
+      
+      devicesData.forEach((deviceId, deviceData) {
+        if (deviceData is Map && deviceData.containsKey('dogId')) {
+          final dogId = deviceData['dogId'] as String?;
+          if (dogId != null && dogId.isNotEmpty) {
+            dogToDeviceMap[dogId] = deviceId as String;
+          }
+        }
+      });
+      
+      // Update dogs with their device assignments
+      for (int i = 0; i < _dogs.length; i++) {
+        final dog = _dogs[i];
+        final assignedDeviceId = dogToDeviceMap[dog.id];
+        
+        if (assignedDeviceId != null && assignedDeviceId != dog.deviceId) {
+          // Update the dog with the device ID
+          _dogs[i] = dog.copyWith(deviceId: assignedDeviceId);
+          
+          // Also update Firestore to keep it in sync
+          try {
+            await FirebaseFirestore.instance
+                .collection('dogs')
+                .doc(dog.id)
+                .update({'deviceId': assignedDeviceId});
+          } catch (e) {
+            print('Failed to update Firestore with deviceId for dog ${dog.id}: $e');
+          }
+        }
+      }
+    } catch (e) {
+      print('Error checking device assignments: $e');
+    }
   }
 
   Future<void> addDog(Dog dog) async {
@@ -227,31 +277,71 @@ class DogProvider with ChangeNotifier {
 
       await _database.child('data/$deviceId').update({'dogId': dogId});
 
+      // Update Firestore as well
+      await FirebaseFirestore.instance
+          .collection('dogs')
+          .doc(dogId)
+          .update({'deviceId': deviceId});
+
       final dogIndex = _dogs.indexWhere((dog) => dog.id == dogId);
       if (dogIndex != -1) {
-        final updatedDog = Dog(
-          id: _dogs[dogIndex].id,
-          name: _dogs[dogIndex].name,
-          breed: _dogs[dogIndex].breed,
-          imageUrl: _dogs[dogIndex].imageUrl,
-          handlerId: _dogs[dogIndex].handlerId,
-          handlerName: _dogs[dogIndex].handlerName,
-          specialization: _dogs[dogIndex].specialization,
-          trainingLevel: _dogs[dogIndex].trainingLevel,
-          lastKnownLocation: _dogs[dogIndex].lastKnownLocation,
-          isActive: _dogs[dogIndex].isActive,
-          nfcTagId: _dogs[dogIndex].nfcTagId,
-          department: _dogs[dogIndex].department,
-          medicalInfo: _dogs[dogIndex].medicalInfo,
-          emergencyContact: _dogs[dogIndex].emergencyContact,
-          deviceId: deviceId,
-        );
-
+        final updatedDog = _dogs[dogIndex].copyWith(deviceId: deviceId);
         _dogs[dogIndex] = updatedDog;
         notifyListeners();
       }
 
       return null;
+    } catch (e) {
+      return 'An unexpected error occurred: $e';
+    }
+  }
+
+  /// Remove device assignment from a dog
+  Future<String?> removeDeviceFromDog(String dogId) async {
+    try {
+      // Find the device currently assigned to this dog
+      final dataSnapshot = await _database.child('data').get();
+      
+      if (!dataSnapshot.exists) {
+        return 'No devices found in database.';
+      }
+      
+      final devicesData = dataSnapshot.value as Map<dynamic, dynamic>;
+      String? deviceToRemove;
+      
+      // Find the device assigned to this dog
+      for (final entry in devicesData.entries) {
+        final deviceId = entry.key as String;
+        final deviceData = entry.value as Map<dynamic, dynamic>;
+        
+        if (deviceData['dogId'] == dogId) {
+          deviceToRemove = deviceId;
+          break;
+        }
+      }
+      
+      if (deviceToRemove == null) {
+        return 'No device is currently assigned to this dog.';
+      }
+      
+      // Remove the dogId from the device in realtime database
+      await _database.child('data/$deviceToRemove/dogId').remove();
+      
+      // Update Firestore to remove deviceId
+      await FirebaseFirestore.instance
+          .collection('dogs')
+          .doc(dogId)
+          .update({'deviceId': FieldValue.delete()});
+      
+      // Update local state
+      final dogIndex = _dogs.indexWhere((dog) => dog.id == dogId);
+      if (dogIndex != -1) {
+        final updatedDog = _dogs[dogIndex].copyWith(deviceId: null);
+        _dogs[dogIndex] = updatedDog;
+        notifyListeners();
+      }
+      
+      return null; // Success
     } catch (e) {
       return 'An unexpected error occurred: $e';
     }
@@ -338,6 +428,43 @@ class DogProvider with ChangeNotifier {
       _error = e.toString();
       notifyListeners();
       rethrow;
+    }
+  }
+
+  /// Manually refresh device assignments from realtime database
+  Future<void> refreshDeviceAssignments() async {
+    try {
+      await _checkAndUpdateDeviceAssignments();
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  /// Get device assignments for debugging
+  Future<Map<String, String>> getDeviceAssignments() async {
+    try {
+      final dataSnapshot = await _database.child('data').get();
+      
+      if (!dataSnapshot.exists) return {};
+      
+      final devicesData = dataSnapshot.value as Map<dynamic, dynamic>;
+      final Map<String, String> assignments = {};
+      
+      devicesData.forEach((deviceId, deviceData) {
+        if (deviceData is Map && deviceData.containsKey('dogId')) {
+          final dogId = deviceData['dogId'] as String?;
+          if (dogId != null && dogId.isNotEmpty) {
+            assignments[deviceId as String] = dogId;
+          }
+        }
+      });
+      
+      return assignments;
+    } catch (e) {
+      print('Error getting device assignments: $e');
+      return {};
     }
   }
 }

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pawtech/models/dog.dart';
-import 'package:pawtech/widgets/custom_button.dart';
 
-class DogNfcScreen extends StatefulWidget {
+class DogNfcScreen extends StatelessWidget {
   final Dog dog;
 
   const DogNfcScreen({
@@ -10,100 +9,43 @@ class DogNfcScreen extends StatefulWidget {
     required this.dog,
   });
 
-  @override
-  State<DogNfcScreen> createState() => _DogNfcScreenState();
-}
-
-class _DogNfcScreenState extends State<DogNfcScreen> with SingleTickerProviderStateMixin {
-  bool _isScanning = false;
-  late AnimationController _animationController;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat(reverse: true);
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  void _startNfcScan() {
-    setState(() {
-      _isScanning = true;
-    });
-
-    // Simulate NFC scanning
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _isScanning = false;
-        });
-
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(
-                  Icons.nfc,
-                  color: Theme.of(context).primaryColor,
-                ),
-                const SizedBox(width: 8),
-                const Text('NFC Tag Detected'),
-              ],
+  Widget _buildInfoCard(String label, String value, IconData icon, BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: Theme.of(context).primaryColor,
+              size: 24,
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildInfoRow('Tag ID', widget.dog.nfcTagId),
-                const SizedBox(height: 8),
-                _buildInfoRow('Dog ID', widget.dog.id),
-                const SizedBox(height: 8),
-                _buildInfoRow('Name', widget.dog.name),
-                const SizedBox(height: 8),
-                _buildInfoRow('Breed', widget.dog.breed),
-                const SizedBox(height: 8),
-                _buildInfoRow('Handler', widget.dog.handlerName),
-                const SizedBox(height: 8),
-                _buildInfoRow('Department', widget.dog.department),
-                const SizedBox(height: 8),
-                _buildInfoRow('Emergency', widget.dog.emergencyContact),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Close'),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        );
-      }
-    });
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      children: [
-        Text(
-          '$label: ',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+            ),
+          ],
         ),
-        Expanded(
-          child: Text(value),
-        ),
-      ],
+      ),
     );
   }
 
@@ -111,111 +53,111 @@ class _DogNfcScreenState extends State<DogNfcScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('NFC Identification'),
+        title: const Text('NFC Information'),
+        centerTitle: true,
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedBuilder(
-                animation: _animation,
-                builder: (context, child) {
-                  return Container(
-                    width: 200,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _isScanning
-                            ? Theme.of(context).primaryColor.withOpacity(_animation.value)
-                            : Theme.of(context).primaryColor.withOpacity(0.3),
-                        width: 2,
-                      ),
-                    ),
-                    child: Center(
-                      child: _isScanning
-                          ? CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Theme.of(context).primaryColor,
-                              ),
-                            )
-                          : Icon(
-                              Icons.nfc,
-                              size: 80,
-                              color: Theme.of(context).primaryColor,
-                            ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 32),
-              Text(
-                _isScanning ? 'Scanning...' : 'NFC Scanner',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).primaryColor,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with NFC Icon
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Theme.of(context).primaryColor.withOpacity(0.3),
+                  width: 1,
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                _isScanning
-                    ? 'Hold your phone near the NFC tag on the dog\'s harness'
-                    : 'Tap the button below to scan the NFC tag on the dog\'s harness',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).textTheme.bodySmall?.color,
-                ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.nfc,
+                    size: 60,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'NFC Tag Information',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Smart harness embedded identification',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 32),
-              CustomButton(
-                text: _isScanning ? 'Cancel' : 'Start Scanning',
-                icon: _isScanning ? Icons.close : Icons.nfc,
-                isLoading: _isScanning,
-                onPressed: _isScanning ? () {
-                  setState(() {
-                    _isScanning = false;
-                  });
-                } : _startNfcScan,
-                width: double.infinity,
+            ),
+            
+            const SizedBox(height: 24),
+            
+            Text(
+              'Dog Information',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 24),
-              if (!_isScanning)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
+            ),
+            
+            const SizedBox(height: 16),
+
+            // Dog Information Cards
+            _buildInfoCard('NFC Tag ID', dog.nfcTagId, Icons.qr_code_2, context),
+            _buildInfoCard('Dog ID', dog.id, Icons.fingerprint, context),
+            _buildInfoCard('Name', dog.name, Icons.pets, context),
+            _buildInfoCard('Breed', dog.breed, Icons.category, context),
+            _buildInfoCard('Handler', dog.handlerName, Icons.person, context),
+            _buildInfoCard('Department', dog.department, Icons.business, context),
+            _buildInfoCard('Emergency Contact', dog.emergencyContact, Icons.emergency, context),
+            
+            const SizedBox(height: 24),
+            
+            // Info Card about NFC
+            Card(
+              color: Theme.of(context).colorScheme.surface,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.info,
-                              color: Theme.of(context).primaryColor,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'About NFC Identification',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                        Icon(
+                          Icons.info_outline,
+                          color: Theme.of(context).primaryColor,
+                          size: 20,
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'NFC tags embedded in the smart harness allow instant access to dog information without specialized scanners. Any smartphone can retrieve data instantly.',
-                          style: TextStyle(
-                            fontSize: 14,
+                        const SizedBox(width: 8),
+                        Text(
+                          'About NFC Technology',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'This information is stored on an NFC tag embedded in the dog\'s smart harness. Any NFC-enabled smartphone can instantly read this data by tapping the harness, providing quick access to essential information in emergency situations.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ),
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );
